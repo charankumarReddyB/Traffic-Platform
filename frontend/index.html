@@ -1,0 +1,105 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Traffic Decision Support</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#f3f5f4;--ink:#16211d;--panel:#fff;--line:#d5dcd8;--acc:#0b6e4f}
+@media(prefers-color-scheme:dark){:root{--bg:#121816;--ink:#e6efeb;--panel:#1b2420;--line:#33403a;--acc:#4fc79c}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--ink);display:grid;grid-template-columns:340px 1fr;height:100vh}
+aside{padding:14px;overflow:auto;background:var(--panel);border-right:1px solid var(--line)}
+#map{height:100%}h1{font-size:17px;margin:0 0 4px}h2{font-size:14px;margin:16px 0 6px}
+button,select,input{font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+button{cursor:pointer;margin:2px 2px 2px 0}button.p{background:var(--acc);color:#fff;border-color:var(--acc)}
+table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid var(--line);padding:3px 4px;text-align:left}
+#log{font-size:13px}.warn{color:#b45309;font-size:12px}
+@media(max-width:800px){body{grid-template-columns:1fr;grid-template-rows:55vh 1fr}#map{order:-1}}
+</style></head><body>
+<aside>
+<h1>Traffic Decision Support</h1><div id="src" class="warn">Traffic source: loading…</div>
+<div id="auth"><h2>Sign in or register</h2>
+<input id="nm" placeholder="Name (register only)"><input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Password (8+ chars)">
+<select id="rr"><option value="">I am a general user</option><option value="bus_operator">Request bus operator access</option><option value="ambulance">Request ambulance operator access</option></select><button class="p" onclick="login()">Sign in</button><button onclick="reg()">Register</button></div>
+<div id="tools" hidden>
+<div><b id="who"></b> <button onclick="logout()">Sign out</button><button onclick="editName()">Edit name</button> <a href="/analysis">Charts</a></div>
+<h2>Route (search or click junctions)</h2><div><input id="q" placeholder="Hospital, bus stop or place" style="width:68%"><button onclick="find()">Search</button></div><div id="sel">Origin: –, Destination: –</div>
+<button class="p" onclick="compare()">Compare routes</button>
+<div>Hour <input id="h" type="number" min="0" max="23" value="9" style="width:60px"> Day <input id="d" type="number" min="0" max="6" value="1" style="width:60px"> <button onclick="pred()">Predict</button> <button onclick="metrics()">Metrics</button></div>
+<div data-r="bus_operator admin"><h2>Public transport</h2><button onclick="myRoutes()">My routes</button><button class="p" onclick="bus()">Compare</button><button onclick="analyse()">Analyse route</button><button onclick="setStops()">Set stops</button><button onclick="propSched()">Propose schedule</button><button onclick="propose()">Propose change</button><button onclick="props()">Proposals</button></div>
+<div data-r="ambulance"><h2>Ambulance</h2><select id="sev"><option value="critical">Critical</option><option value="urgent">Urgent</option><option value="routine">Routine</option></select><select id="hosp"></select><button class="p" onclick="startTrip()">Start trip</button>
+<button onclick="endTrip('Completed')">Complete</button><button onclick="endTrip('Cancelled')">Cancel</button><button onclick="history_()">History</button> <a href="/history">Full history</a></div>
+<div data-r="admin"><h2>Admin</h2>Click a road to toggle congestion.<br><button onclick="resetC()">Clear</button><button onclick="live()">Refresh live data</button><button onclick="scen()">Run scenario</button>
+<button onclick="users()">Users</button><button onclick="reqs()">Role requests</button><button onclick="mkUser()">Add operator</button><button onclick="aud()">Audit log</button><button onclick="scens()">Scenario reports</button><button onclick="assign()">Assign bus route</button><button onclick="setSched()">Set schedule</button><button onclick="reports()">Reports</button><button onclick="retrain()">Retrain on live data</button></div>
+<h2>Results</h2><div id="log">Nothing yet.</div></div>
+</aside><div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+let T="",net,sel=[null,null],roads={},layer=L.layerGroup(),routeL=L.layerGroup(),amb;
+const map=L.map("map").setView([13.025,80.225],13);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",opacity:.55}).addTo(map);layer.addTo(map);routeL.addTo(map);
+const api=async(p,m="GET",b)=>{const r=await fetch("/api"+p,{method:m,headers:{"Content-Type":"application/json","x-token":T},body:b&&JSON.stringify(b)});const j=await r.json();if(!r.ok)throw new Error(j.detail);return j};
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),H=s=>({h:s});
+const log=h=>document.getElementById("log").innerHTML=h, safe=async f=>{try{await f()}catch(e){log("<span class=warn>"+esc(e.message)+"</span>")}};
+const col=x=>x>1.2?"#c1121f":x>.7?"#f59e0b":"#2a9d6f";
+let ME,trip;
+const show=()=>document.querySelectorAll("[data-r]").forEach(e=>e.hidden=!e.dataset.r.split(" ").includes(ME.role));
+async function enter(r){T=r.token;sessionStorage.setItem("t",T);ME=r;if(r.role=="user"&&r.request_status){location="/pending";return}
+ who.textContent=r.name+" ("+r.role+")";auth.hidden=true;tools.hidden=false;show();load();
+ if(r.role=="ambulance"){hosp.innerHTML=(await api("/hospitals")).map(h=>`<option value="${h.id}">${esc(h.name)}</option>`).join("")}}
+const login=()=>safe(async()=>enter(await api("/login","POST",{email:em.value,password:pw.value})));
+const reg=()=>safe(async()=>{await api("/register","POST",{name:nm.value,email:em.value,password:pw.value,request_role:rr.value||null});log(rr.value?"Registered. Sign in to see your approval status.":"Registered. Now sign in.")});
+const logout=async()=>{try{await api("/logout","POST")}catch(e){}sessionStorage.removeItem("t");location="/"};
+const reqs=()=>safe(async()=>log(tbl(["id","name","wants","note",""],(await api("/admin/requests")).map(u=>[u.id,u.name,u.requested_role,u.request_note||"",H(`<button onclick="rdec(${u.id},'approve','${u.requested_role}')">Approve</button><button onclick="rdec(${u.id},'reject')">Reject</button>`)]))));
+const rdec=(i,d,role)=>safe(async()=>{const body={decision:d};if(d=="approve"&&role=="ambulance")body.amb_code=prompt("Ambulance code, e.g. AMB-001");await api(`/admin/requests/${i}/decision`,"POST",body);reqs()});
+const cell=x=>x&&x.h!==undefined?x.h:esc(x);
+const showSel=()=>{document.getElementById("sel").textContent=`Origin: ${sel[0]??"–"}, Destination: ${sel[1]??"–"}`};
+const setSlot=(i,n)=>{sel=[sel[0]??null,sel[1]??null];sel[i]=n;showSel();map.setView(net.nodes[n],15)};
+const find=()=>safe(async()=>{const r=await api("/places/search?q="+encodeURIComponent(q.value));
+ log((r.results.length?tbl(["Place","Type","Use as"],r.results.map(x=>[x.name,x.source,H(`<button onclick="setSlot(0,${+x.node})">Origin</button><button onclick="setSlot(1,${+x.node})">Destination</button>`)])):"No matches.")+(r.geocoder_error?`<br><span class=warn>Address search unavailable: ${esc(r.geocoder_error)}</span>`:"")+`<br><span class=warn>${esc(r.note)}</span>`)});
+const tbl=(h,rows)=>"<table><tr>"+h.map(x=>"<th>"+esc(x)+"</th>").join("")+"</tr>"+rows.map(r=>"<tr>"+r.map(x=>"<td>"+cell(x)+"</td>").join("")+"</tr>").join("")+"</table>";
+const users=()=>safe(async()=>{const r=await api("/admin/users");log(tbl(["id","name","email","role","status",""],r.map(u=>[u.id,u.name,u.email,u.role+(u.amb_code?" "+u.amb_code:""),u.status,u.role=="admin"?"":H(`<button onclick="setSt(${u.id},'${u.status=="active"?"suspended":"active"}')">${u.status=="active"?"Suspend":"Activate"}</button>`)])))});
+const setSt=(i,s)=>safe(async()=>{await api(`/admin/users/${i}/status`,"POST",{status:s});users()});
+const mkUser=()=>safe(async()=>{const role=prompt("Role: bus_operator or ambulance");if(!role)return;const code=role=="ambulance"?prompt("Ambulance code, e.g. AMB-001"):null;
+ await api("/admin/users","POST",{name:prompt("Name"),email:prompt("Email"),password:prompt("Password (8+ chars)"),role,amb_code:code});users()});
+const aud=()=>safe(async()=>log(tbl(["when","user","action"],(await api("/admin/audit")).map(a=>[a.at.slice(0,16),a.user_id,a.action]))));
+const scen=()=>safe(async()=>{ready();const ids=prompt("Road ids to congest (comma separated, hover a road to see its id)");if(!ids)return;
+ const r=await api("/scenario","POST",{name:"Scenario "+new Date().toLocaleTimeString(),src:sel[0],dst:sel[1],edge_ids:ids.split(",").map(Number),level:1.9});routeL.clearLayers();draw(r.baseline,"#1d4ed8","8 6");draw(r.rerouted,"#7c3aed");
+ log(tbl(["Case","Minutes","km"],[["Baseline",r.baseline.minutes,r.baseline.km],["Same route, congested",r.same_route_after_change.minutes,r.same_route_after_change.km],["Rerouted",r.rerouted.minutes,r.rerouted.km]])+`Delay without rerouting: ${r.delay_if_no_reroute} min. Recovered by rerouting: ${r.recovered_by_rerouting} min. (${r.data_source})`)});
+const scens=()=>safe(async()=>log(tbl(["Scenario","Delay","Recovered"],(await api("/scenarios")).map(s=>[s.name,s.result.delay_if_no_reroute,s.result.recovered_by_rerouting]))));
+const history_=()=>safe(async()=>log(tbl(["id","severity","status","min","km"],(await api("/emergency/trips")).map(t=>[t.id,t.severity,t.status,t.est_minutes,t.km]))));
+const endTrip=s=>safe(async()=>{if(!trip)throw new Error("No active trip.");await api(`/emergency/${trip}/finish`,"POST",{status:s});trip=null;log("Trip "+s.toLowerCase()+".")});
+function startTrip(){safe(async()=>{const go=async pos=>{const body={hospital_id:+hosp.value,severity:sev.value};if(pos)Object.assign(body,{lat:pos.coords.latitude,lon:pos.coords.longitude});else{ready();body.src=sel[0]}
+ const r=await api("/emergency/start","POST",body),rec=r.recommended;trip=r.trip_id;routeL.clearLayers();draw(rec,"#c1121f");draw(r.distance_only,"#1d4ed8","8 6");
+ log(tbl(["Route","Min","km"],[["Recommended",rec.minutes,rec.km],["Distance-only",r.distance_only.minutes,r.distance_only.km]])+r.note);
+ if(amb)map.removeLayer(amb);amb=L.circleMarker(rec.coords[0],{radius:9,color:"#c1121f",fillOpacity:1}).addTo(map);let i=0;const t=setInterval(()=>{if(++i>=rec.coords.length)return clearInterval(t);amb.setLatLng(rec.coords[i]);api(`/emergency/${trip}/location`,"POST",{lat:rec.coords[i][0],lon:rec.coords[i][1]}).catch(()=>{})},700)};
+ if(!navigator.geolocation)return safe(()=>go(null));navigator.geolocation.getCurrentPosition(p=>safe(()=>go(p)),()=>safe(()=>go(null)),{timeout:4000})})}  // GPS denied/outside area -> simulated start (pick a junction)
+async function load(){net=await api("/network");src.textContent=net.status.label;if(!window._f){map.fitBounds(net.bounds);window._f=1}layer.clearLayers();
+ net.edges.forEach(e=>{const p=[net.nodes[e.a],net.nodes[e.b]];const l=L.polyline(p,{color:col(e.load),weight:e.congested?8:5}).addTo(layer);l.bindTooltip(`Road ${e.id} load ${e.load} (${e.live?"live":"modelled"})`);
+  l.on("click",()=>safe(async()=>{await api("/congestion","POST",{edge_id:e.id,congested:!e.congested});load()}))});
+ Object.entries(net.nodes).forEach(([n,c])=>L.circleMarker(c,{radius:6,color:"#16211d",fillColor:"#fff",fillOpacity:1}).addTo(layer).on("click",()=>{const i=sel[0]==null?0:sel[1]==null?1:-1;if(i<0)sel=[+n,null];else sel[i]=+n;showSel()}))}
+const ready=()=>{if(sel.length<2||sel[0]==null||sel[1]==null)throw new Error("Pick origin and destination junctions on the map.")};
+function draw(r,c,d){L.polyline(r.coords,{color:c,weight:4,dashArray:d}).addTo(routeL)}
+const row=(n,r)=>`<tr><td>${n}</td><td>${r.minutes} min</td><td>${r.km} km</td></tr>`;
+function compare(){safe(async()=>{ready();routeL.clearLayers();const r=await api(`/compare?src=${sel[0]}&dst=${sel[1]}`);draw(r.static_shortest,"#1d4ed8","8 6");draw(r.traffic_aware,"#7c3aed");
+ log(`<table>${row("Distance-only",r.static_shortest)}${row("Traffic-aware",r.traffic_aware)}</table>Saved ${r.saved_minutes} min (${r.saved_pct}%).<br>Nodes expanded: Dijkstra ${r.nodes_expanded.dijkstra}, A* ${r.nodes_expanded.astar}`)})}
+const live=()=>safe(async()=>{const r=await api("/admin/refresh-live","POST");log(r.label);load()});
+const resetC=()=>safe(async()=>{await api("/reset","POST");routeL.clearLayers();load()});
+const bus=()=>safe(async()=>{const r=await api("/bus/compare");routeL.clearLayers();Object.values(r).forEach((v,k)=>draw(v,["#1d4ed8","#c1121f","#7c3aed"][k%3],k?"8 6":null));log(tbl(["Route","Min","Avg load","Congested roads"],Object.entries(r).map(([n,v])=>[n,v.minutes,v.avg_edge_load,v.congested_segments.length]))||"")});
+const myRoutes=()=>safe(async()=>log(tbl(["id","name","junctions","stops"],(await api("/bus/routes")).map(r=>[r.id,r.name,r.nodes.join("-"),r.stops.join(", ")||"none set"]))));
+const propose=()=>safe(async()=>{const id=+prompt("Route id");const nodes=prompt("New junction sequence, e.g. 12,13,19,20").split(",").map(Number);const r=await api("/bus/proposals","POST",{route_id:id,nodes,note:prompt("Reason")||""});log(`Submitted for admin review. Current ${r.current_minutes} min, proposed ${r.proposed_minutes} min.`)});
+const props=()=>safe(async()=>log(tbl(["id","route","kind","change","status",""],(await api("/bus/proposals")).map(p=>[p.id,p.route,p.kind,p.summary,p.status,ME.role=="admin"&&p.status=="pending"?H(`<button onclick="dec(${p.id},'approved')">Approve</button><button onclick="dec(${p.id},'rejected')">Reject</button>`):""]))));
+const pickId=()=>+prompt("Route id (see My routes)");
+const analyse=()=>safe(async()=>{const r=await api(`/bus/routes/${pickId()}/analysis`);log(tbl(["Stop","Free-flow","Expected","Delay"],r.stops.map(s=>[s.stop,s.free_flow,s.expected,s.delay]))+`Trip ${r.trip_minutes} min, cycle ${r.cycle_minutes} min. A ${r.headway}-min headway needs ${r.needed} buses (${r.needed_free_flow} in free flow); fleet ${r.fleet}: ${r.short_by?"SHORT by "+r.short_by:"OK"}.<br>`+tbl(["Depart","Arrive last stop"],r.timetable.map(t=>[t.depart,t.arrive_last_stop]))+`<span class=warn>${r.schedule_is_default?"Default schedule (none set yet). ":""}${r.assumptions}. ${r.data_source}</span>`)});
+const setStops=()=>safe(async()=>{const id=pickId();const stops=prompt("Stops in order as name:junction, e.g. Depot:12,Market:14,Hospital:17").split(",").map(x=>{const[n,j]=x.split(":");return{name:n.trim(),node:+j}});await api(`/bus/routes/${id}/stops`,"POST",{stops});log("Stops saved.")});
+const schedBody=()=>({first:prompt("First departure HH:MM","06:00"),last:prompt("Last departure HH:MM","22:00"),headway_min:+prompt("Headway (minutes)","15"),fleet:+prompt("Buses available","4")});
+const propSched=()=>safe(async()=>{const id=pickId();const r=await api("/bus/schedule-proposals","POST",{route_id:id,...schedBody(),note:prompt("Reason")||""});log(`Submitted for review. Headway ${r.headway} min needs ${r.needed} buses; fleet ${r.fleet}${r.short_by?" (short by "+r.short_by+")":""}.`)});
+const setSched=()=>safe(async()=>{const id=pickId();await api(`/admin/bus-routes/${id}/schedule`,"POST",schedBody());log("Schedule saved.")});
+const dec=(i,d)=>safe(async()=>{await api(`/admin/proposals/${i}/decision`,"POST",{decision:d});props()});
+const assign=()=>safe(async()=>{await api(`/admin/bus-routes/${prompt("Route id")}/assign`,"POST",{operator_id:+prompt("Bus operator user id (see Users)")});log("Route assigned.")});
+const editName=()=>safe(async()=>{await api("/me","PATCH",{name:prompt("New name")});log("Name updated.")});
+const retrain=()=>safe(async()=>{const r=await api("/admin/retrain","POST");log(tbl(["Model","MAE","RMSE"],[["Random Forest",r.random_forest.MAE,r.random_forest.RMSE],["Per-road mean baseline",r.baseline_road_mean.MAE,r.baseline_road_mean.RMSE]])+`Trained on ${r.n_train}, tested on ${r.n_test} later live readings. ${r.beats_baseline?"Beats":"Does NOT beat"} the baseline.`)});
+const reports=()=>safe(async()=>{const r=await api("/reports"),m=r.prediction;log(tbl(["Severity","Status","Trips","Avg min"],r.trips.map(t=>[t.severity,t.status,t.n,t.avg_min]))+`Scenarios: ${r.scenarios.count}, mean delay ${r.scenarios.mean_delay_if_no_reroute} min, mean recovered by rerouting ${r.scenarios.mean_recovered} min.<br>Proposals: ${JSON.stringify(r.proposals)}. Live observations logged: ${r.live_observations}.<br><span class=warn>${r.traffic.label}</span><canvas id="cv" height="170"></canvas>`);
+ new Chart(document.getElementById("cv"),{type:"bar",data:{labels:["MAE","RMSE"],datasets:[{label:"Random Forest",data:[m.random_forest.MAE,m.random_forest.RMSE]},{label:"Hourly-mean baseline",data:[m.baseline_hourly_mean.MAE,m.baseline_hourly_mean.RMSE]}]},options:{plugins:{title:{display:true,text:"Prediction error, lower is better (synthetic data)"}}}})});
+const metrics=()=>safe(async()=>{const r=await api("/metrics");log("<table>"+["random_forest","baseline_hourly_mean"].map(k=>`<tr><td>${k}</td><td>MAE ${r[k].MAE}</td><td>RMSE ${r[k].RMSE}</td></tr>`).join("")+`</table><span class=warn>${r.note}</span>`)});
+const pred=()=>safe(async()=>{const r=await api(`/predict?hour=${h.value}&dow=${d.value}`);log(`Mean load ${r.mean_load}<br>Hotspots: `+r.hotspots.map(x=>`road ${x.edge} (${x.load})`).join(", "))});
+(async()=>{const t=sessionStorage.getItem("t");if(!t)return;T=t;try{enter({...(await api("/me")),token:t})}catch(e){sessionStorage.removeItem("t");T=""}})();
+</script></body></html>

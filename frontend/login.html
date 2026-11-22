@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sign In - Urban Traffic Platform</title>
+  <style>
+    :root { --bg:#f4f6f5; --ink:#16211d; --mut:#51605a; --acc:#0b6e4f; --line:#cfd8d3; --panel:#fff; --err:#c1121f; }
+    @media(prefers-color-scheme:dark){ :root { --bg:#121816; --ink:#e6efeb; --mut:#9db0a8; --acc:#4fc79c; --line:#33403a; --panel:#1b2420; } }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--ink); display:grid; place-items:center; min-height:100vh; padding:16px; }
+    .card { width:100%; max-width:400px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:28px; box-shadow:0 4px 12px rgba(0,0,0,0.05); }
+    h1 { font-size:22px; margin:0 0 8px; color:var(--acc); }
+    p.sub { margin:0 0 20px; color:var(--mut); font-size:14px; }
+    label { display:block; font-weight:600; margin-bottom:4px; font-size:13px; }
+    input { width:100%; padding:9px 12px; margin-bottom:16px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); font-size:14px; }
+    button { width:100%; padding:10px; border-radius:6px; background:var(--acc); color:#fff; border:0; font-size:15px; font-weight:600; cursor:pointer; }
+    button:hover { opacity:0.92; }
+    .msg { padding:10px; border-radius:6px; margin-bottom:16px; font-size:13px; display:none; }
+    .msg.err { background:#fee2e2; color:var(--err); border:1px solid #f87171; display:block; }
+    .foot { margin-top:20px; text-align:center; font-size:13px; color:var(--mut); }
+    .foot a { color:var(--acc); font-weight:600; text-decoration:none; }
+    .foot a:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Sign In</h1>
+    <p class="sub">AI-Powered Urban Traffic & Transit Platform</p>
+    <div id="msg" class="msg"></div>
+    <form id="f" onsubmit="event.preventDefault(); doLogin();">
+      <label for="em">Email Address</label>
+      <input id="em" type="email" required autocomplete="email" placeholder="name@domain.com">
+      <label for="pw">Password</label>
+      <input id="pw" type="password" required autocomplete="current-password" placeholder="••••••••">
+      <button type="submit" id="btn">Sign In</button>
+    </form>
+    <div class="foot">
+      Don't have an account? <a href="/register">Register here</a><br><br>
+      <a href="/">← Back to Landing Page</a>
+    </div>
+  </div>
+  <script>
+    const msg = document.getElementById("msg");
+    async function doLogin() {
+      msg.className = "msg"; msg.textContent = "";
+      const em = document.getElementById("em").value.trim();
+      const pw = document.getElementById("pw").value;
+      const btn = document.getElementById("btn");
+      btn.disabled = true; btn.textContent = "Signing in...";
+      try {
+        const r = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: em, password: pw })
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Sign in failed");
+        sessionStorage.setItem("t", d.token);
+        sessionStorage.setItem("role", d.role);
+        sessionStorage.setItem("name", d.name);
+        if (d.role === "admin") location = "/admin-dashboard";
+        else if (d.role === "ambulance") location = "/ambulance-dashboard";
+        else if (d.role === "bus_operator") location = "/bus-dashboard";
+        else if (d.role === "user" && d.request_status === "pending") location = "/pending";
+        else location = "/map";
+      } catch (e) {
+        msg.className = "msg err"; msg.textContent = e.message;
+        btn.disabled = false; btn.textContent = "Sign In";
+      }
+    }
+  </script>
+</body>
+</html>

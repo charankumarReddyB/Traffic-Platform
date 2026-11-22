@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Traffic Decision Support</title><style>:root{--bg:#f3f5f4;--ink:#16211d;--mut:#51605a;--acc:#0b6e4f;--line:#cfd8d3;--panel:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#121816;--ink:#e6efeb;--mut:#9db0a8;--acc:#4fc79c;--line:#33403a;--panel:#1b2420}}
+body{margin:0;font:16px/1.55 system-ui,sans-serif;background:var(--bg);color:var(--ink)}a{color:var(--acc)}
+.b{display:inline-block;padding:10px 18px;border-radius:6px;background:var(--acc);color:#fff;text-decoration:none;font-weight:600;margin-right:8px;border:0;font-size:15px;cursor:pointer}.b.o{background:none;color:var(--acc);border:1px solid var(--acc)}
+table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid var(--line);padding:6px;text-align:left}</style>
+<style>main{max-width:980px;margin:0 auto;padding:56px 20px;display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}h1{font:700 40px/1.1 Georgia,serif;margin:0 0 16px}p{max-width:58ch}small{display:block;margin-top:26px;color:var(--mut);max-width:58ch}@media(max-width:760px){main{grid-template-columns:1fr}}</style></head>
+<body><main><div><h1>See what one blocked road does to a driver, a bus and an ambulance.</h1>
+<p>Close a road, then compare routes, bus corridors and emergency trips in one place, with before-and-after times calculated from the same road graph.</p>
+<p><a class="b" href="/app">Sign in or register</a></p>
+<small>Traffic is simulated unless live mode is switched on, and the page always says which. Ambulance trips are route recommendations only: nothing here controls traffic signals or other drivers.</small></div>
+<svg id="g" viewBox="0 0 300 300" role="img" aria-label="Road grid with a blocked road and a detour"></svg></main>
+<script>const P=(r,c)=>[25+c*50,25+r*50],svg=document.getElementById("g");let o="";
+for(let r=0;r<6;r++)for(let c=0;c<6;c++){const[x,y]=P(r,c);if(c<5)o+=`<line x1="${x}" y1="${y}" x2="${x+50}" y2="${y}" stroke="var(--line)" stroke-width="4"/>`;if(r<5)o+=`<line x1="${x}" y1="${y}" x2="${x}" y2="${y+50}" stroke="var(--line)" stroke-width="4"/>`}
+const pl=(pts,col,w,d)=>`<polyline points="${pts.map(p=>P(...p).join(",")).join(" ")}" fill="none" stroke="${col}" stroke-width="${w}" ${d?'stroke-dasharray="8 6"':""} stroke-linecap="round" stroke-linejoin="round"/>`;
+o+=pl([[2,0],[2,5]],"#1d4ed8",4,1)+pl([[2,2],[2,3]],"#c1121f",10)+pl([[2,0],[2,1],[2,2],[3,2],[3,3],[2,3],[2,4],[2,5]],"#7c3aed",5);svg.innerHTML=o</script></body></html>

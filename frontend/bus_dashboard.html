@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bus Operator Console - Urban Traffic Platform</title>
+  <style>
+    :root { --bg:#f4f6f5; --ink:#16211d; --mut:#51605a; --acc:#0b6e4f; --line:#cfd8d3; --panel:#fff; --err:#c1121f; }
+    @media(prefers-color-scheme:dark){ :root { --bg:#121816; --ink:#e6efeb; --mut:#9db0a8; --acc:#4fc79c; --line:#33403a; --panel:#1b2420; } }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--ink); }
+    header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+    .brand { font-weight:700; font-size:16px; color:var(--acc); text-decoration:none; display:flex; align-items:center; gap:6px; }
+    nav { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    nav a { color:var(--ink); text-decoration:none; padding:5px 9px; border-radius:5px; font-weight:500; font-size:13px; }
+    nav a:hover, nav a.active { background:var(--line); color:var(--acc); }
+    
+    main { max-width:1100px; margin:0 auto; padding:24px 16px; display:flex; flex-direction:column; gap:20px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    @media(max-width:860px){ .grid { grid-template-columns:1fr; } }
+    
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; }
+    h2 { margin:0 0 10px; font-size:17px; }
+    
+    table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+    th, td { padding:7px 9px; text-align:left; border-bottom:1px solid var(--line); }
+    th { font-weight:600; color:var(--mut); }
+    
+    input, select, textarea, button { font:inherit; padding:7px 11px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); }
+    button { background:var(--acc); color:#fff; border:0; font-weight:600; cursor:pointer; }
+    button.sec { background:transparent; color:var(--acc); border:1px solid var(--acc); }
+    button:hover { opacity:0.9; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+    .badge-pending { background:#fef3c7; color:#92400e; }
+    .badge-approved { background:#dcfce7; color:#15803d; }
+    .badge-rejected { background:#fee2e2; color:#b91c1c; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="brand">🚍 Bus Operator Console</a>
+    <nav>
+      <a href="/bus-dashboard" class="active">My Routes</a>
+      <a href="/transit-planning">Corridors & Timetable</a>
+      <a href="/map">Interactive Map</a>
+      <a href="/reports">Reports</a>
+      <a href="/app">Legacy Console</a>
+    </nav>
+    <div style="font-size:13px;" id="authStatus">
+      <a href="/login" style="color:var(--acc); font-weight:600;">Sign In</a>
+    </div>
+  </header>
+
+  <main>
+    <div>
+      <h1 style="margin:0 0 6px; font-size:24px;" id="busOpTitle">Bus Operator Dashboard</h1>
+      <p style="margin:0; color:var(--mut); font-size:14px;">
+        Manage assigned routes, configure stop orders, and track headway feasibility under live congestion.
+      </p>
+    </div>
+
+    <div class="grid">
+      <!-- Assigned Routes -->
+      <div class="card">
+        <h2>My Assigned Routes</h2>
+        <table id="assignedTable">
+          <thead><tr><th>Route ID</th><th>Name</th><th>Junctions</th><th>Configured Stops</th></tr></thead>
+          <tbody id="assignedBody"><tr><td colspan="4">Loading assigned routes...</td></tr></tbody>
+        </table>
+
+        <h3 style="margin:18px 0 6px; font-size:14px;">Configure Ordered Stops for Route</h3>
+        <form onsubmit="event.preventDefault(); saveStops();">
+          <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Route ID</label>
+          <input id="stopRouteId" type="number" value="1" style="width:100%; margin-bottom:8px;" required>
+
+          <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Ordered Stops (Name:JunctionID, comma-separated)</label>
+          <input id="stopData" type="text" placeholder="e.g. Depot:12, Market:14, Central:15, Hospital:17" style="width:100%; margin-bottom:12px;" required>
+
+          <button type="submit">Save Ordered Stops</button>
+        </form>
+        <div id="stopsMsg" style="margin-top:8px; font-size:12px;"></div>
+      </div>
+
+      <!-- Proposals & Status -->
+      <div class="card">
+        <h2>My Submitted Proposals & Review Status</h2>
+        <table id="propTable">
+          <thead><tr><th>#</th><th>Route</th><th>Kind</th><th>Change Summary</th><th>Status</th></tr></thead>
+          <tbody id="propBody"><tr><td colspan="5">Loading proposals...</td></tr></tbody>
+        </table>
+        <div style="margin-top:16px;">
+          <a href="/transit-planning" style="color:var(--acc); font-weight:600; font-size:13px;">→ Submit New Route / Schedule Proposal</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const T = sessionStorage.getItem("t") || "";
+    const role = sessionStorage.getItem("role") || "";
+    const name = sessionStorage.getItem("name") || "";
+
+    if (T && name) {
+      document.getElementById("authStatus").innerHTML = `<b>${name}</b> (${role}) | <a href="#" onclick="sessionStorage.clear();location='/login';" style="color:var(--err);">Sign out</a>`;
+      document.getElementById("busOpTitle").textContent = `Bus Operator: ${name}`;
+    }
+
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+    async function loadData() {
+      if (!T) { alert("Please sign in as a bus operator."); location = "/login"; return; }
+      try {
+        const [routesRes, propsRes] = await Promise.all([
+          fetch("/api/bus/routes", { headers: { "x-token": T } }).then(r => r.json()),
+          fetch("/api/bus/proposals", { headers: { "x-token": T } }).then(r => r.json())
+        ]);
+
+        // 1. Assigned routes
+        if (!routesRes.length) {
+          document.getElementById("assignedBody").innerHTML = '<tr><td colspan="4">No bus routes currently assigned by administrator.</td></tr>';
+        } else {
+          document.getElementById("assignedBody").innerHTML = routesRes.map(r => `
+            <tr>
+              <td><b>#${r.id}</b></td>
+              <td>${esc(r.name)}</td>
+              <td>${r.nodes.join(" &rarr; ")}</td>
+              <td>${r.stops && r.stops.length ? r.stops.join(", ") : '<span style="color:var(--mut);">None configured</span>'}</td>
+            </tr>
+          `).join("");
+        }
+
+        // 2. Proposals
+        if (!propsRes.length) {
+          document.getElementById("propBody").innerHTML = '<tr><td colspan="5">No proposals submitted yet.</td></tr>';
+        } else {
+          document.getElementById("propBody").innerHTML = propsRes.map(p => `
+            <tr>
+              <td>#${p.id}</td>
+              <td>Route #${p.route_id || p.route}</td>
+              <td>${esc(p.kind)}</td>
+              <td>${esc(p.summary || p.change)}</td>
+              <td><span class="badge badge-${p.status}">${esc(p.status).toUpperCase()}</span></td>
+            </tr>
+          `).join("");
+        }
+
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function saveStops() {
+      const rid = Number(document.getElementById("stopRouteId").value);
+      const raw = document.getElementById("stopData").value;
+      const msg = document.getElementById("stopsMsg");
+      msg.textContent = "";
+
+      try {
+        const stops = raw.split(",").map(x => {
+          const parts = x.split(":");
+          if (parts.length < 2) throw new Error("Stops must be in 'Name:Junction' format");
+          return { name: parts[0].trim(), node: Number(parts[1].trim()) };
+        });
+
+        const r = await fetch(`/api/bus/routes/${rid}/stops`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-token": T },
+          body: JSON.stringify({ stops })
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Failed to save stops");
+        msg.innerHTML = '<span style="color:#15803d; font-weight:600;">Ordered stops saved successfully!</span>';
+        loadData();
+      } catch (e) {
+        msg.innerHTML = `<span style="color:var(--err);">${e.message}</span>`;
+      }
+    }
+
+    loadData();
+  </script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Public Transport & Transit Planning - Urban Traffic Platform</title>
+  <style>
+    :root { --bg:#f4f6f5; --ink:#16211d; --mut:#51605a; --acc:#0b6e4f; --line:#cfd8d3; --panel:#fff; --err:#c1121f; }
+    @media(prefers-color-scheme:dark){ :root { --bg:#121816; --ink:#e6efeb; --mut:#9db0a8; --acc:#4fc79c; --line:#33403a; --panel:#1b2420; } }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--ink); }
+    header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+    .brand { font-weight:700; font-size:16px; color:var(--acc); text-decoration:none; display:flex; align-items:center; gap:6px; }
+    nav { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    nav a { color:var(--ink); text-decoration:none; padding:5px 9px; border-radius:5px; font-weight:500; font-size:13px; }
+    nav a:hover, nav a.active { background:var(--line); color:var(--acc); }
+    
+    main { max-width:1100px; margin:0 auto; padding:24px 16px; display:flex; flex-direction:column; gap:20px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    @media(max-width:860px){ .grid { grid-template-columns:1fr; } }
+    
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; }
+    h2 { margin:0 0 10px; font-size:17px; }
+    
+    table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+    th, td { padding:7px 9px; text-align:left; border-bottom:1px solid var(--line); }
+    th { font-weight:600; color:var(--mut); }
+    
+    input, select, textarea, button { font:inherit; padding:7px 11px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); }
+    button { background:var(--acc); color:#fff; border:0; font-weight:600; cursor:pointer; }
+    button.sec { background:transparent; color:var(--acc); border:1px solid var(--acc); }
+    button:hover { opacity:0.9; }
+    
+    .alert { padding:10px 14px; border-radius:6px; font-size:13px; margin-top:10px; }
+    .alert-warn { background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
+    .alert-ok { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="brand">🚦 Urban Traffic Platform</a>
+    <nav>
+      <a href="/map">Map</a>
+      <a href="/route-compare">Route Comparison</a>
+      <a href="/traffic-prediction">Traffic Prediction</a>
+      <a href="/transit-planning" class="active">Transit Planning</a>
+      <a href="/scenarios">Scenarios</a>
+      <a href="/reports">Reports</a>
+      <a href="/app">Legacy Console</a>
+    </nav>
+    <div>
+      <a href="/app" style="color:var(--acc); text-decoration:none; font-weight:600; font-size:13px;">Open Console</a>
+    </div>
+  </header>
+
+  <main>
+    <div>
+      <h1 style="margin:0 0 6px; font-size:24px;">Public Transport Corridors & Scheduling</h1>
+      <p style="margin:0; color:var(--mut); font-size:14px;">
+        Monitor bus route delays, evaluate headway feasibility against fleet constraints, and propose operational route/schedule adjustments.
+      </p>
+    </div>
+
+    <div class="grid">
+      <!-- Corridor Overview -->
+      <div class="card">
+        <h2>Active Transit Corridors</h2>
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <select id="routeSelect" onchange="loadRouteAnalysis(this.value)" style="flex:1;">
+            <option value="1">Route 1: Corridor A (Major Arterial)</option>
+            <option value="2">Route 2: Corridor B (Detour Alternative)</option>
+          </select>
+          <button onclick="loadRouteAnalysis(routeSelect.value)">Refresh</button>
+        </div>
+        <div id="corridorSummary" style="font-size:13px; line-height:1.6;">Loading corridor status...</div>
+
+        <h3 style="margin:16px 0 6px; font-size:14px;">Stop-by-Stop Delay Analysis</h3>
+        <table id="stopsTable">
+          <thead><tr><th>Stop Name</th><th>Free-Flow</th><th>Expected</th><th>Delay</th></tr></thead>
+          <tbody id="stopsBody"><tr><td colspan="4">Loading stops...</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- Fleet Headway Check & Timetable -->
+      <div class="card">
+        <h2>Headway & Fleet Feasibility Check</h2>
+        <div id="fleetStatus">Loading fleet evaluation...</div>
+
+        <h3 style="margin:16px 0 6px; font-size:14px;">Timetable Preview</h3>
+        <div style="max-height:220px; overflow-y:auto;">
+          <table id="ttTable">
+            <thead><tr><th>Departure</th><th>Est. Arrival at Final Stop</th></tr></thead>
+            <tbody id="ttBody"><tr><td colspan="2">Loading timetable...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Proposal Forms -->
+    <div class="grid">
+      <div class="card">
+        <h2>Propose Route Modification</h2>
+        <p style="margin:0 0 10px; font-size:12px; color:var(--mut);">
+          Propose an altered junction sequence to avoid congested bottlenecks. Submits to administrator review.
+        </p>
+        <form id="routePropForm" onsubmit="event.preventDefault(); submitRouteProposal();">
+          <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Route ID</label>
+          <input id="propRouteId" type="number" value="1" style="width:100%; margin-bottom:8px;">
+
+          <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">New Junction Sequence (comma-separated)</label>
+          <input id="propNodes" type="text" placeholder="e.g. 12,18,19,20,21,22,23,17" style="width:100%; margin-bottom:8px;" required>
+
+          <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Operational Justification</label>
+          <input id="propNote" type="text" placeholder="e.g. Avoid construction work near 2nd Avenue" style="width:100%; margin-bottom:12px;" required>
+
+          <button type="submit">Submit Route Proposal</button>
+        </form>
+        <div id="routePropMsg" style="margin-top:10px; font-size:12px;"></div>
+      </div>
+
+      <div class="card">
+        <h2>Propose Schedule / Headway Change</h2>
+        <p style="margin:0 0 10px; font-size:12px; color:var(--mut);">
+          Adjust operating window, headway, or requested bus allocation.
+        </p>
+        <form id="schedPropForm" onsubmit="event.preventDefault(); submitScheduleProposal();">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+            <div>
+              <label style="font-size:12px; font-weight:600;">First Run</label>
+              <input id="propFirst" type="text" value="06:00" style="width:100%;">
+            </div>
+            <div>
+              <label style="font-size:12px; font-weight:600;">Last Run</label>
+              <input id="propLast" type="text" value="22:00" style="width:100%;">
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+            <div>
+              <label style="font-size:12px; font-weight:600;">Headway (minutes)</label>
+              <input id="propHeadway" type="number" min="5" max="120" value="15" style="width:100%;">
+            </div>
+            <div>
+              <label style="font-size:12px; font-weight:600;">Buses Assigned</label>
+              <input id="propFleet" type="number" min="1" max="50" value="4" style="width:100%;">
+            </div>
+          </div>
+          <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Reason / Traffic Context</label>
+          <input id="propSchedNote" type="text" placeholder="e.g. Higher peak-hour frequency needed" style="width:100%; margin-bottom:12px;" required>
+
+          <button type="submit">Submit Schedule Proposal</button>
+        </form>
+        <div id="schedPropMsg" style="margin-top:10px; font-size:12px;"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const T = sessionStorage.getItem("t") || "";
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+    async function loadRouteAnalysis(rid = 1) {
+      try {
+        const headers = T ? { "x-token": T } : {};
+        const r = await fetch(`/api/bus/routes/${rid}/analysis`, { headers });
+        if (!r.ok) {
+          if (r.status === 401) {
+            document.getElementById("corridorSummary").innerHTML = 
+              'Please sign in to view full public transport operational data.';
+            return;
+          }
+          throw new Error("Failed to load route analysis");
+        }
+        const d = await r.json();
+
+        // 1. Corridor Summary
+        document.getElementById("corridorSummary").innerHTML = `
+          <b>Corridor Trip Duration:</b> ${d.trip_minutes} min (Free-flow: ${d.free_flow_minutes} min)<br>
+          <b>Round-Trip Cycle:</b> ${d.cycle_minutes} min<br>
+          <b>Data Source:</b> <span style="font-weight:600;">${d.data_source}</span><br>
+          <span style="font-size:11px; color:var(--mut);">${d.assumptions}</span>
+        `;
+
+        // 2. Stops Table
+        document.getElementById("stopsBody").innerHTML = d.stops.map(s => `
+          <tr>
+            <td><b>${esc(s.stop)}</b></td>
+            <td>${s.free_flow} min</td>
+            <td>${s.expected} min</td>
+            <td><span style="color:${s.delay > 1 ? "var(--err)" : "var(--acc)"}; font-weight:600;">+${s.delay} min</span></td>
+          </tr>
+        `).join("");
+
+        // 3. Fleet Check
+        const isShort = d.short_by > 0;
+        document.getElementById("fleetStatus").innerHTML = `
+          <div class="alert ${isShort ? "alert-warn" : "alert-ok"}">
+            <b>Fleet Sufficiency:</b> ${isShort ? `DEFICIT: Short by ${d.short_by} buses!` : "SUFFICIENT: Fleet covers headway comfortably."}<br>
+            Current Headway: <b>${d.headway} min</b> | Required Fleet: <b>${d.needed} buses</b> (Free-flow: ${d.needed_free_flow})<br>
+            Fleet Assigned: <b>${d.fleet} buses</b>
+          </div>
+        `;
+
+        // 4. Timetable
+        document.getElementById("ttBody").innerHTML = d.timetable.map(t => `
+          <tr><td>${t.depart}</td><td>${t.arrive_last_stop}</td></tr>
+        `).join("");
+
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function submitRouteProposal() {
+      const msg = document.getElementById("routePropMsg");
+      const rid = document.getElementById("propRouteId").value;
+      const nodes = document.getElementById("propNodes").value.split(",").map(x => Number(x.trim()));
+      const note = document.getElementById("propNote").value.trim();
+      msg.textContent = "";
+
+      try {
+        const r = await fetch("/api/bus/proposals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-token": T },
+          body: JSON.stringify({ route_id: +rid, nodes, note })
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Proposal submission failed");
+        msg.innerHTML = `<span style="color:#15803d; font-weight:600;">Proposal #${d.id} submitted! Current: ${d.current_minutes} min → Proposed: ${d.proposed_minutes} min.</span>`;
+      } catch (e) {
+        msg.innerHTML = `<span style="color:var(--err);">${e.message}</span>`;
+      }
+    }
+
+    async function submitScheduleProposal() {
+      const msg = document.getElementById("schedPropMsg");
+      const rid = document.getElementById("propRouteId").value;
+      const first = document.getElementById("propFirst").value;
+      const last = document.getElementById("propLast").value;
+      const headway_min = Number(document.getElementById("propHeadway").value);
+      const fleet = Number(document.getElementById("propFleet").value);
+      const note = document.getElementById("propSchedNote").value.trim();
+      msg.textContent = "";
+
+      try {
+        const r = await fetch("/api/bus/schedule-proposals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-token": T },
+          body: JSON.stringify({ route_id: +rid, first, last, headway_min, fleet, note })
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Schedule proposal failed");
+        msg.innerHTML = `<span style="color:#15803d; font-weight:600;">Schedule proposal submitted! Needed fleet: ${d.needed} buses.</span>`;
+      } catch (e) {
+        msg.innerHTML = `<span style="color:var(--err);">${e.message}</span>`;
+      }
+    }
+
+    loadRouteAnalysis(1);
+  </script>
+</body>
+</html>

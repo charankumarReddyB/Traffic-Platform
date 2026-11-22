@@ -1,0 +1,10 @@
+<configuration>
+    <input>
+        <net-file value="anna_nagar.net.xml"/>
+        <route-files value="anna_nagar.rou.xml"/>
+    </input>
+    <time>
+        <begin value="0"/>
+        <end value="3600"/>
+    </time>
+</configuration>

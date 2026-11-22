@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: traffic
+      POSTGRES_PASSWORD: trafficpass
+      POSTGRES_DB: trafficdb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traffic -d trafficdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://traffic:trafficpass@db:5432/trafficdb
+      NETWORK_FILE: network.json
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: adminpassword123
+      TOMTOM_API_KEY: ${TOMTOM_API_KEY:-}
+      TRAFFIC_SOURCE: ${TRAFFIC_SOURCE:-simulated}
+      TOMTOM_QUOTA_PER_DAY: "2500"
+      LIVE_MAX_EDGES: "15"
+      LIVE_TTL_SECONDS: "600"
+      RATE_LOGIN_PER_MIN: "20"
+      RATE_API_PER_MIN: "300"
+
+volumes:
+  postgres_data:

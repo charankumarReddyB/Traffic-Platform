@@ -1,0 +1,42 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.venv/
+env/
+venv/
+ENV/
+
+# Databases & runtime local state
+*.db
+*.sqlite3
+traffic.db
+ui_test.db
+r.db
+t.db
+a.db
+pl.db
+s.db
+cache/
+uvicorn_*.log
+ui_smoke_output.txt
+
+# Unit test & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+junit.xml
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env

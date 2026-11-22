@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AI Traffic Prediction Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root { --bg:#f4f6f5; --ink:#16211d; --mut:#51605a; --acc:#0b6e4f; --line:#cfd8d3; --panel:#fff; --err:#c1121f; }
+    @media(prefers-color-scheme:dark){ :root { --bg:#121816; --ink:#e6efeb; --mut:#9db0a8; --acc:#4fc79c; --line:#33403a; --panel:#1b2420; } }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--ink); }
+    header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+    .brand { font-weight:700; font-size:16px; color:var(--acc); text-decoration:none; display:flex; align-items:center; gap:6px; }
+    nav { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    nav a { color:var(--ink); text-decoration:none; padding:5px 9px; border-radius:5px; font-weight:500; font-size:13px; }
+    nav a:hover, nav a.active { background:var(--line); color:var(--acc); }
+    
+    main { max-width:1100px; margin:0 auto; padding:24px 16px; display:flex; flex-direction:column; gap:20px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    @media(max-width:800px){ .grid { grid-template-columns:1fr; } }
+    
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; }
+    h2 { margin:0 0 10px; font-size:17px; color:var(--ink); }
+    
+    table { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
+    th, td { padding:8px 10px; text-align:left; border-bottom:1px solid var(--line); }
+    th { font-weight:600; color:var(--mut); }
+    
+    select, button { font:inherit; padding:7px 12px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); }
+    button { background:var(--acc); color:#fff; border:0; font-weight:600; cursor:pointer; }
+    button:hover { opacity:0.9; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+    .badge-pass { background:#dcfce7; color:#15803d; }
+    .badge-fail { background:#fee2e2; color:#b91c1c; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="brand">🚦 Urban Traffic Platform</a>
+    <nav>
+      <a href="/map">Map</a>
+      <a href="/route-compare">Route Comparison</a>
+      <a href="/traffic-prediction" class="active">Traffic Prediction</a>
+      <a href="/transit-planning">Transit Planning</a>
+      <a href="/scenarios">Scenarios</a>
+      <a href="/reports">Reports</a>
+      <a href="/app">Legacy Console</a>
+    </nav>
+    <div>
+      <a href="/app" style="color:var(--acc); text-decoration:none; font-weight:600; font-size:13px;">Open Console</a>
+    </div>
+  </header>
+
+  <main>
+    <div>
+      <h1 style="margin:0 0 6px; font-size:24px;">AI-Powered Traffic Prediction Engine</h1>
+      <p style="margin:0; color:var(--mut); font-size:14px;">
+        Evaluates road network congestion for future departure times using time-dependent edge weights trained without future data leakage.
+      </p>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+        <div>
+          <h2 style="margin:0;">24-Hour Diurnal Congestion Profile</h2>
+          <span style="font-size:12px; color:var(--mut);">Compares Random Forest predictions against Historical Hourly Mean</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label style="font-weight:600; font-size:13px;">Day of Week:</label>
+          <select id="dowSelect" onchange="loadCurve(this.value)">
+            <option value="0">Monday</option>
+            <option value="1" selected>Tuesday</option>
+            <option value="2">Wednesday</option>
+            <option value="3">Thursday</option>
+            <option value="4">Friday</option>
+            <option value="5">Saturday</option>
+            <option value="6">Sunday</option>
+          </select>
+        </div>
+      </div>
+      <div style="height:320px;">
+        <canvas id="curveChart"></canvas>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Rigorous Model Evaluation (Zero Temporal Leakage)</h2>
+        <p style="margin:0 0 10px; font-size:12px; color:var(--mut);">
+          Evaluated strictly on held-out future observations with 95% bootstrap confidence intervals.
+        </p>
+        <table id="metricsTable">
+          <tr><th>Model / Baseline</th><th>MAE [95% CI]</th><th>RMSE</th><th>Status</th></tr>
+          <tbody id="metricsBody"><tr><td colspan="4">Loading metrics...</td></tr></tbody>
+        </table>
+        <div id="splitNote" style="margin-top:12px; font-size:12px; color:var(--mut);"></div>
+      </div>
+
+      <div class="card">
+        <h2>Retraining Pipeline & Live Model State</h2>
+        <p style="margin:0 0 12px; font-size:12px; color:var(--mut);">
+          Continuous retraining on real TomTom Flow observations logged to the database.
+        </p>
+        <div id="retrainInfo" style="font-size:13px; line-height:1.6; margin-bottom:14px;">
+          Checking live model registry...
+        </div>
+        <button id="retrainBtn" onclick="triggerRetrain()">Retrain Model on Live Readings</button>
+        <div id="retrainResult" style="margin-top:10px; font-size:12px;"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const T = sessionStorage.getItem("t") || "";
+    let chartInstance = null;
+
+    async function loadCurve(dow = 1) {
+      try {
+        const headers = T ? { "x-token": T } : {};
+        const r = await fetch(`/api/predict/curve?dow=${dow}`, { headers });
+        if (!r.ok) {
+          if (r.status === 401) {
+            document.getElementById("curveChart").parentElement.innerHTML = 
+              '<p style="padding:40px; text-align:center; color:var(--mut);">Please sign in from the <a href="/login" style="color:var(--acc);">login page</a> to view AI predictions.</p>';
+            return;
+          }
+          throw new Error("Failed to load prediction curve");
+        }
+        const d = await r.json();
+
+        const ctx = document.getElementById("curveChart").getContext("2d");
+        if (chartInstance) chartInstance.destroy();
+
+        chartInstance = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: d.hours.map(h => `${String(h).padStart(2, '0')}:00`),
+            datasets: [
+              {
+                label: "AI Random Forest",
+                data: d.random_forest,
+                borderColor: "#0b6e4f",
+                backgroundColor: "rgba(11,110,79,0.1)",
+                borderWidth: 2.5,
+                fill: true,
+                tension: 0.3
+              },
+              {
+                label: "Baseline: Historical Mean",
+                data: d.baseline_hourly_mean,
+                borderColor: "#f59e0b",
+                borderDash: [5, 5],
+                borderWidth: 2,
+                fill: false,
+                tension: 0.2
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: { title: { display: true, text: "Congestion Load Factor (0.0 = Empty, 1.0 = Capacity)" }, min: 0 }
+            }
+          }
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function loadMetrics() {
+      try {
+        const headers = T ? { "x-token": T } : {};
+        const r = await fetch("/api/metrics", { headers });
+        if (!r.ok) return;
+        const d = await r.json();
+
+        const rf = d.random_forest;
+        const bl = d.baseline_hourly_mean;
+        const last = d.baseline_last_observed;
+
+        const beatsMean = rf.MAE < bl.MAE;
+        const beatsLast = rf.MAE < last.MAE;
+
+        document.getElementById("metricsBody").innerHTML = `
+          <tr>
+            <td><b>Random Forest (AI Model)</b></td>
+            <td><b>${rf.MAE}</b> [${rf.MAE_95_CI[0]}, ${rf.MAE_95_CI[1]}]</td>
+            <td><b>${rf.RMSE}</b></td>
+            <td><span class="badge badge-pass">PRIMARY</span></td>
+          </tr>
+          <tr>
+            <td>Baseline 1: Historical Mean</td>
+            <td>${bl.MAE} [${bl.MAE_95_CI[0]}, ${bl.MAE_95_CI[1]}]</td>
+            <td>${bl.RMSE}</td>
+            <td><span class="badge ${beatsMean ? "badge-pass" : "badge-fail"}">${beatsMean ? "Outperformed" : "Tied"}</span></td>
+          </tr>
+          <tr>
+            <td>Baseline 2: Last Observed (Naive)</td>
+            <td>${last.MAE} [${last.MAE_95_CI[0]}, ${last.MAE_95_CI[1]}]</td>
+            <td>${last.RMSE}</td>
+            <td><span class="badge ${beatsLast ? "badge-pass" : "badge-fail"}">${beatsLast ? "Outperformed" : "Tied"}</span></td>
+          </tr>
+        `;
+
+        document.getElementById("splitNote").textContent = `${d.split} | Training samples: ${d.n_train}, Test samples: ${d.n_test}.`;
+
+        document.getElementById("retrainInfo").innerHTML = `
+          <b>Split Methodology:</b> Strict chronological split without lookahead leakage.<br>
+          <b>Training Observations:</b> ${d.n_train} intervals<br>
+          <b>Evaluation Horizon:</b> ${d.n_test} held-out future intervals<br>
+          <b>Live Observations Logged:</b> ${d.live_retrained ? d.live_retrained.n_train : "Awaiting threshold"}
+        `;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function triggerRetrain() {
+      const btn = document.getElementById("retrainBtn");
+      const res = document.getElementById("retrainResult");
+      btn.disabled = true; btn.textContent = "Retraining in progress...";
+      res.textContent = "";
+      try {
+        const r = await fetch("/api/admin/retrain", {
+          method: "POST",
+          headers: { "x-token": T }
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Retrain rejected");
+        res.innerHTML = `<span style="color:#15803d; font-weight:600;">Retraining complete! Model MAE: ${d.random_forest.MAE} (Trained on ${d.n_train} observations).</span>`;
+        loadMetrics();
+      } catch (err) {
+        res.innerHTML = `<span style="color:var(--err);">${err.message}</span>`;
+      } finally {
+        btn.disabled = false; btn.textContent = "Retrain Model on Live Readings";
+      }
+    }
+
+    loadCurve(1);
+    loadMetrics();
+  </script>
+</body>
+</html>

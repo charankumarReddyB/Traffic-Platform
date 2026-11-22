@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Interactive Traffic Map - Anna Nagar, Chennai</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root { --bg:#f4f6f5; --ink:#16211d; --mut:#51605a; --acc:#0b6e4f; --line:#cfd8d3; --panel:#fff; --err:#c1121f; }
+    @media(prefers-color-scheme:dark){ :root { --bg:#121816; --ink:#e6efeb; --mut:#9db0a8; --acc:#4fc79c; --line:#33403a; --panel:#1b2420; } }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.45 system-ui,sans-serif; background:var(--bg); color:var(--ink); display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+    header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+    .brand { font-weight:700; font-size:16px; color:var(--acc); text-decoration:none; display:flex; align-items:center; gap:6px; }
+    nav { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    nav a { color:var(--ink); text-decoration:none; padding:5px 9px; border-radius:5px; font-weight:500; font-size:13px; }
+    nav a:hover, nav a.active { background:var(--line); color:var(--acc); }
+    .auth-bar { display:flex; align-items:center; gap:8px; font-size:13px; }
+    
+    .main-layout { display:grid; grid-template-columns:360px 1fr; flex:1; height:calc(100vh - 54px); }
+    aside { background:var(--panel); border-right:1px solid var(--line); padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+    #map { height:100%; width:100%; }
+    
+    .badge { display:inline-block; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; }
+    .badge-sim { background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; }
+    .badge-live { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
+    
+    .panel-box { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:12px; }
+    .panel-box h3 { margin:0 0 8px; font-size:14px; }
+    
+    input, select, button { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); }
+    button { background:var(--acc); color:#fff; border:0; font-weight:600; cursor:pointer; }
+    button.sec { background:transparent; color:var(--acc); border:1px solid var(--acc); }
+    button:hover { opacity:0.9; }
+    
+    .search-row { display:flex; gap:6px; margin-bottom:8px; }
+    .search-row input { flex:1; }
+    .legend { display:flex; gap:12px; font-size:12px; margin-top:6px; }
+    .legend-item { display:flex; align-items:center; gap:4px; }
+    .dot { width:10px; height:10px; border-radius:50%; }
+    
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th, td { padding:5px 6px; text-align:left; border-bottom:1px solid var(--line); }
+    th { font-weight:600; color:var(--mut); }
+    
+    @media(max-width:860px){
+      .main-layout { grid-template-columns:1fr; grid-template-rows:45vh 1fr; }
+      #map { order:-1; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="brand">🚦 Urban Traffic Platform</a>
+    <nav>
+      <a href="/map" class="active">Map</a>
+      <a href="/route-compare">Route Comparison</a>
+      <a href="/traffic-prediction">Traffic Prediction</a>
+      <a href="/transit-planning">Transit Planning</a>
+      <a href="/scenarios">Scenarios</a>
+      <a href="/reports">Reports</a>
+      <a href="/app">Legacy Console</a>
+    </nav>
+    <div class="auth-bar" id="authBar">
+      <span id="userStatus">Not signed in</span>
+      <a href="/login" id="loginLink" style="color:var(--acc); font-weight:600; text-decoration:none;">Sign in</a>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <aside>
+      <div>
+        <h2 style="margin:0 0 4px; font-size:17px;">Anna Nagar Traffic Network</h2>
+        <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+          <span id="sourceBadge" class="badge badge-sim">SIMULATED</span>
+          <span id="dataAge" style="font-size:12px; color:var(--mut);">Checking...</span>
+        </div>
+      </div>
+
+      <div class="panel-box">
+        <h3>Place Search (Nominatim / Local)</h3>
+        <p style="margin:0 0 8px; font-size:12px; color:var(--mut);">Search hospitals, major roads, and landmarks with 1 req/s rate limit & local caching.</p>
+        <div class="search-row">
+          <input id="q" placeholder="e.g. Hospital, 2nd Avenue, Depot" onkeydown="if(event.key==='Enter') doSearch();">
+          <button onclick="doSearch()">Search</button>
+        </div>
+        <div id="searchResults" style="max-height:160px; overflow-y:auto; font-size:12px;"></div>
+      </div>
+
+      <div class="panel-box">
+        <h3>Route Selection</h3>
+        <p style="margin:0 0 8px; font-size:12px; color:var(--mut);">Click junctions on the map or use search results.</p>
+        <div style="margin-bottom:8px; font-size:13px;">
+          <div><b>Origin:</b> <span id="origText">Not selected</span></div>
+          <div><b>Destination:</b> <span id="destText">Not selected</span></div>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button onclick="calcRoute('aware')">Traffic-Aware Route</button>
+          <button class="sec" onclick="calcRoute('static')">Distance-Only</button>
+          <button class="sec" onclick="clearRoute()">Clear</button>
+        </div>
+      </div>
+
+      <div class="panel-box">
+        <h3>Network & Congestion Legend</h3>
+        <div class="legend">
+          <div class="legend-item"><div class="dot" style="background:#2a9d6f;"></div> Free Flow (&lt;0.8)</div>
+          <div class="legend-item"><div class="dot" style="background:#f59e0b;"></div> Moderate (0.8-1.2)</div>
+          <div class="legend-item"><div class="dot" style="background:#c1121f;"></div> Congested (&ge;1.2)</div>
+        </div>
+        <p style="margin:8px 0 0; font-size:11px; color:var(--mut);">
+          Click any road segment to toggle simulated congestion incident.
+        </p>
+      </div>
+
+      <div class="panel-box" id="routeOutput" style="display:none;">
+        <h3 id="routeTitle">Route Summary</h3>
+        <div id="routeDetails"></div>
+      </div>
+    </aside>
+
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const T = sessionStorage.getItem("t") || "";
+    const userRole = sessionStorage.getItem("role") || "";
+    const userName = sessionStorage.getItem("name") || "";
+    
+    // Auth status header
+    if (T && userName) {
+      document.getElementById("userStatus").textContent = `${userName} (${userRole})`;
+      const link = document.getElementById("loginLink");
+      link.textContent = "Sign out";
+      link.href = "#";
+      link.onclick = () => { sessionStorage.clear(); location = "/login"; };
+    }
+
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+    
+    let sel = [null, null];
+    let net = null;
+    let map = L.map("map").setView([13.088, 80.207], 14);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap", opacity: 0.7 }).addTo(map);
+
+    let roadLayer = L.layerGroup().addTo(map);
+    let nodeLayer = L.layerGroup().addTo(map);
+    let routeLayer = L.layerGroup().addTo(map);
+    let hospLayer = L.layerGroup().addTo(map);
+
+    const getCol = load => load >= 1.2 ? "#c1121f" : load >= 0.8 ? "#f59e0b" : "#2a9d6f";
+
+    async function loadNetwork() {
+      try {
+        const headers = T ? { "x-token": T } : {};
+        const r = await fetch("/api/network", { headers });
+        if (!r.ok) return;
+        net = await r.json();
+        
+        // Update header badge
+        const badge = document.getElementById("sourceBadge");
+        const age = document.getElementById("dataAge");
+        const mode = (net.status?.mode || net.status?.source || "simulated").toUpperCase();
+        badge.textContent = mode;
+        badge.className = "badge " + (mode === "LIVE" ? "badge-live" : "badge-sim");
+        const ageSec = net.status?.data_age_seconds ?? net.status?.age_seconds ?? "0";
+        age.textContent = `${net.status?.live_roads || 0} roads live (${ageSec}s old)`;
+
+        roadLayer.clearLayers();
+        nodeLayer.clearLayers();
+
+        if (!window._fit && net.bounds) {
+          map.fitBounds(net.bounds);
+          window._fit = true;
+        }
+
+        // Draw edges
+        net.edges.forEach(e => {
+          const p1 = net.nodes[e.a];
+          const p2 = net.nodes[e.b];
+          if (!p1 || !p2) return;
+          const line = L.polyline([p1, p2], {
+            color: getCol(e.load),
+            weight: e.congested ? 7 : 4,
+            opacity: 0.85
+          }).addTo(roadLayer);
+          
+          line.bindTooltip(`Road #${e.id}: ${e.name || "Major corridor"} | Speed: ${e.speed} km/h | Load: ${e.load.toFixed(2)} (${e.live ? "LIVE" : "SIMULATED"})`);
+          line.on("click", async () => {
+            if (!T) { alert("Please sign in to toggle road congestion."); return; }
+            await fetch("/api/congestion", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-token": T },
+              body: JSON.stringify({ edge_id: e.id, congested: !e.congested })
+            });
+            loadNetwork();
+          });
+        });
+
+        // Draw nodes
+        Object.entries(net.nodes).forEach(([nid, coords]) => {
+          const marker = L.circleMarker(coords, {
+            radius: 5,
+            color: "#16211d",
+            fillColor: "#fff",
+            fillOpacity: 0.9,
+            weight: 2
+          }).addTo(nodeLayer);
+
+          marker.bindTooltip(`Junction #${nid}`);
+          marker.on("click", () => selectJunction(+nid));
+        });
+
+        // Load and plot hospitals
+        loadHospitals();
+      } catch (err) {
+        console.error("Failed to load network:", err.message, err.stack);
+      }
+    }
+
+    async function loadHospitals() {
+      try {
+        const headers = T ? { "x-token": T } : {};
+        const r = await fetch("/api/hospitals", { headers });
+        if (!r.ok) return;
+        const hosps = await r.json();
+        hospLayer.clearLayers();
+        hosps.forEach(h => {
+          const coords = net.nodes[h.node];
+          if (!coords) return;
+          const icon = L.divIcon({
+            className: "hosp-icon",
+            html: '<div style="background:#c1121f; color:#fff; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3);">H</div>',
+            iconSize: [20, 20]
+          });
+          const m = L.marker(coords, { icon }).addTo(hospLayer);
+          m.bindPopup(`<b>${esc(h.name)}</b><br>Emergency Hospital<br><button onclick="selectJunction(${h.node}, 1)" style="margin-top:4px; padding:3px 6px; font-size:11px;">Set as Destination</button>`);
+        });
+      } catch (e) {}
+    }
+
+    function selectJunction(nid, forceSlot = -1) {
+      if (forceSlot === 0) sel[0] = nid;
+      else if (forceSlot === 1) sel[1] = nid;
+      else {
+        if (sel[0] === null) sel[0] = nid;
+        else if (sel[1] === null) sel[1] = nid;
+        else { sel[0] = nid; sel[1] = null; }
+      }
+      document.getElementById("origText").textContent = sel[0] !== null ? `Junction #${sel[0]}` : "Not selected";
+      document.getElementById("destText").textContent = sel[1] !== null ? `Junction #${sel[1]}` : "Not selected";
+      if (net && net.nodes[nid]) map.panTo(net.nodes[nid]);
+    }
+
+    async function calcRoute(mode = 'aware') {
+      if (sel[0] === null || sel[1] === null) {
+        alert("Please pick both an Origin and a Destination junction.");
+        return;
+      }
+      try {
+        const url = `/api/route?src=${sel[0]}&dst=${sel[1]}&algo=astar&mode=${mode}`;
+        const headers = T ? { "x-token": T } : {};
+        const r = await fetch(url, { headers });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Routing error");
+
+        routeLayer.clearLayers();
+        const color = mode === 'aware' ? "#7c3aed" : "#1d4ed8";
+        L.polyline(d.coords, { color, weight: 6, opacity: 0.9 }).addTo(routeLayer);
+        map.fitBounds(L.latLngBounds(d.coords), { padding: [40, 40] });
+
+        const out = document.getElementById("routeOutput");
+        const det = document.getElementById("routeDetails");
+        document.getElementById("routeTitle").textContent = mode === 'aware' ? "Traffic-Aware Route" : "Distance-Only Route";
+        out.style.display = "block";
+        det.innerHTML = `
+          <table>
+            <tr><th>Metric</th><th>Value</th></tr>
+            <tr><td>Total Travel Time</td><td><b>${d.minutes} min</b></td></tr>
+            <tr><td>Total Distance</td><td>${d.km} km</td></tr>
+            <tr><td>Nodes Expanded (A*)</td><td>${d.expanded}</td></tr>
+            <tr><td>Waypoints</td><td>${d.path.length} junctions</td></tr>
+          </table>
+        `;
+      } catch (e) {
+        alert("Routing failed: " + e.message);
+      }
+    }
+
+    function clearRoute() {
+      routeLayer.clearLayers();
+      sel = [null, null];
+      document.getElementById("origText").textContent = "Not selected";
+      document.getElementById("destText").textContent = "Not selected";
+      document.getElementById("routeOutput").style.display = "none";
+    }
+
+    async function doSearch() {
+      const q = document.getElementById("q").value.trim();
+      if (!q) return;
+      const resDiv = document.getElementById("searchResults");
+      resDiv.innerHTML = "Searching...";
+      try {
+        const headers = T ? { "x-token": T } : {};
+        const r = await fetch("/api/places/search?q=" + encodeURIComponent(q), { headers });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || "Search error");
+        if (!data.results.length) {
+          resDiv.innerHTML = '<div style="color:var(--mut); padding:4px 0;">No matching places found.</div>';
+          return;
+        }
+        resDiv.innerHTML = data.results.map(x => `
+          <div style="padding:6px 0; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <b>${esc(x.name)}</b> <span style="font-size:10px; color:var(--mut);">(${esc(x.source)})</span>
+            </div>
+            <div>
+              <button onclick="selectJunction(${x.node}, 0)" style="padding:2px 6px; font-size:11px;">Origin</button>
+              <button onclick="selectJunction(${x.node}, 1)" style="padding:2px 6px; font-size:11px;">Dest</button>
+            </div>
+          </div>
+        `).join("");
+      } catch (err) {
+        resDiv.innerHTML = `<span style="color:var(--err);">${esc(err.message)}</span>`;
+      }
+    }
+
+    loadNetwork();
+    setInterval(loadNetwork, 30000); // 30s auto-refresh
+  </script>
+</body>
+</html>

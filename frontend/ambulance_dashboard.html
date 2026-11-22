@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Ambulance Operator Dashboard - Urban Traffic Platform</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root { --bg:#f4f6f5; --ink:#16211d; --mut:#51605a; --acc:#0b6e4f; --line:#cfd8d3; --panel:#fff; --err:#c1121f; }
+    @media(prefers-color-scheme:dark){ :root { --bg:#121816; --ink:#e6efeb; --mut:#9db0a8; --acc:#4fc79c; --line:#33403a; --panel:#1b2420; } }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.45 system-ui,sans-serif; background:var(--bg); color:var(--ink); display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+    header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+    .brand { font-weight:700; font-size:16px; color:var(--acc); text-decoration:none; display:flex; align-items:center; gap:6px; }
+    nav { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    nav a { color:var(--ink); text-decoration:none; padding:5px 9px; border-radius:5px; font-weight:500; font-size:13px; }
+    nav a:hover, nav a.active { background:var(--line); color:var(--acc); }
+    
+    .main-layout { display:grid; grid-template-columns:380px 1fr; flex:1; height:calc(100vh - 54px); }
+    aside { background:var(--panel); border-right:1px solid var(--line); padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+    #map { height:100%; width:100%; }
+    
+    .panel-box { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:12px; }
+    .panel-box h3 { margin:0 0 8px; font-size:14px; }
+    
+    input, select, button { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); }
+    button { background:var(--acc); color:#fff; border:0; font-weight:600; cursor:pointer; }
+    button.danger { background:var(--err); color:#fff; }
+    button.sec { background:transparent; color:var(--acc); border:1px solid var(--acc); }
+    button:hover { opacity:0.9; }
+    
+    .disclaimer { background:#fff1f2; color:#9f1239; border:1px solid #fecdd3; border-radius:6px; padding:10px; font-size:12px; line-height:1.4; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+    .badge-active { background:#dcfce7; color:#15803d; }
+    .badge-ready { background:#e0f2fe; color:#0369a1; }
+    
+    @media(max-width:860px){
+      .main-layout { grid-template-columns:1fr; grid-template-rows:45vh 1fr; }
+      #map { order:-1; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="brand">🚑 Ambulance Dispatch Console</a>
+    <nav>
+      <a href="/ambulance-dashboard" class="active">Ambulance Console</a>
+      <a href="/history">Trip History</a>
+      <a href="/map">Interactive Map</a>
+      <a href="/reports">Reports</a>
+      <a href="/app">Legacy Console</a>
+    </nav>
+    <div style="font-size:13px;" id="authStatus">
+      <a href="/login" style="color:var(--acc); font-weight:600;">Sign In</a>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <aside>
+      <div>
+        <h2 style="margin:0 0 4px; font-size:17px;" id="opHeader">Ambulance Operator</h2>
+        <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+          <span id="tripStatusBadge" class="badge badge-ready">READY</span>
+          <span id="gpsStatus" style="font-size:12px; color:var(--mut);">GPS: Simulated</span>
+        </div>
+      </div>
+
+      <div class="disclaimer">
+        <b>Mandatory Safety Requirement:</b> Route recommendations only. This system does NOT control traffic signals, siren priority, or other drivers. Drivers must obey local traffic safety regulations.
+      </div>
+
+      <div class="panel-box">
+        <h3>Dispatch Trip</h3>
+        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Target Hospital</label>
+        <select id="hospSelect" style="width:100%; margin-bottom:10px;"><option>Loading hospitals...</option></select>
+
+        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Severity Profile</label>
+        <select id="sevSelect" style="width:100%; margin-bottom:10px;">
+          <option value="critical">Critical (0.5 Queue Bypass Factor)</option>
+          <option value="urgent">Urgent (0.25 Queue Bypass Factor)</option>
+          <option value="routine">Routine (0.0 Normal Traffic Model)</option>
+        </select>
+
+        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Origin Junction (or Browser GPS)</label>
+        <input id="srcNode" type="number" value="0" style="width:100%; margin-bottom:12px;" placeholder="e.g. 0">
+
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button id="startBtn" onclick="startEmergencyTrip()" style="flex:1;">Start Emergency Trip</button>
+          <button id="completeBtn" onclick="finishTrip('Completed')" class="sec" style="display:none;">Complete</button>
+          <button id="cancelBtn" onclick="finishTrip('Cancelled')" class="danger" style="display:none;">Cancel</button>
+        </div>
+      </div>
+
+      <div class="panel-box" id="activeTripBox" style="display:none;">
+        <h3>Active Trip Telemetry</h3>
+        <div id="tripTelemetry" style="font-size:13px; line-height:1.6;"></div>
+      </div>
+
+      <div class="panel-box">
+        <h3>Severity Profiles Explained</h3>
+        <p style="margin:0; font-size:12px; color:var(--mut); line-height:1.5;">
+          <b>Critical:</b> Uses siren assumption to partially bypass queues on congested arterial links.<br>
+          <b>Urgent:</b> Intermediate clearance factor for priority transit.<br>
+          <b>Routine:</b> Standard traffic-aware routing matching non-emergency flow.
+        </p>
+      </div>
+    </aside>
+
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const T = sessionStorage.getItem("t") || "";
+    const role = sessionStorage.getItem("role") || "";
+    const name = sessionStorage.getItem("name") || "";
+
+    if (T && name) {
+      document.getElementById("authStatus").innerHTML = `<b>${name}</b> (${role}) | <a href="#" onclick="sessionStorage.clear();location='/login';" style="color:var(--err);">Sign out</a>`;
+      document.getElementById("opHeader").textContent = `Ambulance: ${name}`;
+    }
+
+    let map = L.map("map").setView([13.088, 80.207], 14);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap", opacity: 0.65 }).addTo(map);
+
+    let net = null;
+    let baseLayer = L.layerGroup().addTo(map);
+    let routeLayers = L.layerGroup().addTo(map);
+    let ambMarker = null;
+    let currentTripId = null;
+    let simInterval = null;
+
+    async function init() {
+      const headers = T ? { "x-token": T } : {};
+      const [netRes, hospRes] = await Promise.all([
+        fetch("/api/network", { headers }).then(r => r.ok ? r.json() : null),
+        fetch("/api/hospitals", { headers }).then(r => r.ok ? r.json() : [])
+      ]);
+      net = netRes;
+      if (!net || !net.edges) return;
+      if (net.bounds) map.fitBounds(net.bounds);
+
+      // Draw edges
+      net.edges.forEach(e => {
+        const p1 = net.nodes[e.a], p2 = net.nodes[e.b];
+        if (p1 && p2) L.polyline([p1, p2], { color: "#cfd8d3", weight: 2 }).addTo(baseLayer);
+      });
+
+      // Populate hospitals
+      const sel = document.getElementById("hospSelect");
+      if (hospRes && hospRes.length) {
+        sel.innerHTML = hospRes.map(h => `<option value="${h.id}">${h.name} (Junction #${h.node})</option>`).join("");
+
+        // Plot hospitals
+        hospRes.forEach(h => {
+          const coords = net.nodes[h.node];
+          if (!coords) return;
+          const icon = L.divIcon({
+            html: '<div style="background:#c1121f; color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3);">H</div>',
+            iconSize: [22, 22]
+          });
+          L.marker(coords, { icon }).addTo(baseLayer).bindPopup(`<b>${h.name}</b><br>Emergency Facility`);
+        });
+      }
+
+      // Try browser GPS
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          p => { document.getElementById("gpsStatus").textContent = "GPS: Live Browser Signal"; },
+          () => { document.getElementById("gpsStatus").textContent = "GPS: Simulated (Denied)"; }
+        );
+      }
+    }
+
+    async function startEmergencyTrip() {
+      if (!T) { alert("Please sign in as an ambulance operator first."); return; }
+      const hosp_id = Number(document.getElementById("hospSelect").value);
+      const severity = document.getElementById("sevSelect").value;
+      const src = Number(document.getElementById("srcNode").value);
+
+      const body = { hospital_id: hosp_id, severity, src };
+
+      try {
+        const r = await fetch("/api/emergency/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-token": T },
+          body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Failed to start emergency trip");
+
+        currentTripId = d.trip_id;
+        document.getElementById("tripStatusBadge").textContent = "ACTIVE";
+        document.getElementById("tripStatusBadge").className = "badge badge-active";
+        document.getElementById("startBtn").style.display = "none";
+        document.getElementById("completeBtn").style.display = "inline-block";
+        document.getElementById("cancelBtn").style.display = "inline-block";
+        document.getElementById("activeTripBox").style.display = "block";
+
+        document.getElementById("tripTelemetry").innerHTML = `
+          <b>Trip ID:</b> #${d.trip_id}<br>
+          <b>Recommended ETA:</b> <b>${d.recommended.minutes} min</b> (${d.recommended.km} km)<br>
+          <b>Distance-only ETA:</b> ${d.distance_only.minutes} min<br>
+          <b>Time Saved:</b> ${Math.max(0, d.distance_only.minutes - d.recommended.minutes).toFixed(2)} min<br>
+          <span style="font-size:11px; color:var(--mut);">${d.note}</span>
+        `;
+
+        routeLayers.clearLayers();
+        // Distance-only: blue dashed
+        L.polyline(d.distance_only.coords, { color: "#1d4ed8", weight: 3, dashArray: "6 6" }).addTo(routeLayers);
+        // Recommended: red solid
+        L.polyline(d.recommended.coords, { color: "#c1121f", weight: 5 }).addTo(routeLayers);
+        map.fitBounds(L.latLngBounds(d.recommended.coords), { padding: [40, 40] });
+
+        // Simulate breadcrumb tracking along route
+        const coords = d.recommended.coords;
+        if (ambMarker) map.removeLayer(ambMarker);
+        ambMarker = L.circleMarker(coords[0], { radius: 9, color: "#c1121f", fillColor: "#ef4444", fillOpacity: 1 }).addTo(map);
+
+        let step = 0;
+        if (simInterval) clearInterval(simInterval);
+        simInterval = setInterval(async () => {
+          if (++step >= coords.length) { clearInterval(simInterval); return; }
+          const lat = coords[step][0], lon = coords[step][1];
+          ambMarker.setLatLng([lat, lon]);
+          // send location update
+          await fetch(`/api/emergency/${currentTripId}/location`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-token": T },
+            body: JSON.stringify({ lat, lon })
+          }).catch(() => {});
+        }, 1200);
+
+      } catch (err) {
+        alert("Trip start error: " + err.message);
+      }
+    }
+
+    async function finishTrip(status) {
+      if (!currentTripId) return;
+      if (simInterval) clearInterval(simInterval);
+      try {
+        const r = await fetch(`/api/emergency/${currentTripId}/finish`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-token": T },
+          body: JSON.stringify({ status })
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Finish failed");
+        alert(`Trip #${currentTripId} ${status}.`);
+
+        document.getElementById("tripStatusBadge").textContent = "READY";
+        document.getElementById("tripStatusBadge").className = "badge badge-ready";
+        document.getElementById("startBtn").style.display = "inline-block";
+        document.getElementById("completeBtn").style.display = "none";
+        document.getElementById("cancelBtn").style.display = "none";
+        document.getElementById("activeTripBox").style.display = "none";
+        routeLayers.clearLayers();
+        if (ambMarker) map.removeLayer(ambMarker);
+        currentTripId = null;
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

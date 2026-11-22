@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Administrator Dashboard - Urban Traffic Platform</title>
+  <style>
+    :root { --bg:#f4f6f5; --ink:#16211d; --mut:#51605a; --acc:#0b6e4f; --line:#cfd8d3; --panel:#fff; --err:#c1121f; }
+    @media(prefers-color-scheme:dark){ :root { --bg:#121816; --ink:#e6efeb; --mut:#9db0a8; --acc:#4fc79c; --line:#33403a; --panel:#1b2420; } }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--ink); }
+    header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+    .brand { font-weight:700; font-size:16px; color:var(--acc); text-decoration:none; display:flex; align-items:center; gap:6px; }
+    nav { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    nav a { color:var(--ink); text-decoration:none; padding:5px 9px; border-radius:5px; font-weight:500; font-size:13px; }
+    nav a:hover, nav a.active { background:var(--line); color:var(--acc); }
+    
+    main { max-width:1160px; margin:0 auto; padding:24px 16px; display:flex; flex-direction:column; gap:20px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    @media(max-width:860px){ .grid { grid-template-columns:1fr; } }
+    
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; }
+    h2 { margin:0 0 10px; font-size:17px; }
+    
+    table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+    th, td { padding:7px 9px; text-align:left; border-bottom:1px solid var(--line); }
+    th { font-weight:600; color:var(--mut); }
+    
+    input, select, textarea, button { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); }
+    button { background:var(--acc); color:#fff; border:0; font-weight:600; cursor:pointer; }
+    button.sec { background:transparent; color:var(--acc); border:1px solid var(--acc); }
+    button.danger { background:var(--err); color:#fff; border:0; }
+    button:hover { opacity:0.9; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+    .badge-active { background:#dcfce7; color:#15803d; }
+    .badge-suspended { background:#fee2e2; color:#b91c1c; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="brand">⚙️ Platform Administration</a>
+    <nav>
+      <a href="/admin-dashboard" class="active">Admin Console</a>
+      <a href="/map">Interactive Map</a>
+      <a href="/traffic-prediction">AI Prediction</a>
+      <a href="/transit-planning">Transit Planning</a>
+      <a href="/reports">Reports</a>
+      <a href="/app">Legacy Console</a>
+    </nav>
+    <div style="font-size:13px;" id="authStatus">
+      <a href="/login" style="color:var(--acc); font-weight:600;">Sign In</a>
+    </div>
+  </header>
+
+  <main>
+    <div>
+      <h1 style="margin:0 0 6px; font-size:24px;">Platform Administration & Governance</h1>
+      <p style="margin:0; color:var(--mut); font-size:14px;">
+        Review operator requests, manage authorized accounts, inspect audit trails, and oversee transit proposals.
+      </p>
+    </div>
+
+    <!-- Role Requests -->
+    <div class="card">
+      <h2>Pending Operator Role Requests</h2>
+      <div id="requestsBox">Loading requests...</div>
+    </div>
+
+    <!-- User Management & Route Assignment -->
+    <div class="grid">
+      <div class="card">
+        <h2>User Accounts & Permissions</h2>
+        <div style="max-height:280px; overflow-y:auto;">
+          <table id="userTable">
+            <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody id="userBody"><tr><td colspan="6">Loading users...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Transit Corridor Assignment</h2>
+        <p style="margin:0 0 10px; font-size:12px; color:var(--mut);">
+          Assign designated bus corridor IDs to approved bus operator accounts.
+        </p>
+        <form onsubmit="event.preventDefault(); assignRoute();" style="display:flex; flex-direction:column; gap:8px;">
+          <div>
+            <label style="font-size:12px; font-weight:600;">Corridor Route ID</label>
+            <input id="assignRid" type="number" value="1" style="width:100%;" required>
+          </div>
+          <div>
+            <label style="font-size:12px; font-weight:600;">Bus Operator User ID</label>
+            <input id="assignUid" type="number" placeholder="Enter Operator ID from users table" style="width:100%;" required>
+          </div>
+          <button type="submit">Assign Route to Operator</button>
+        </form>
+        <div id="assignMsg" style="margin-top:6px; font-size:12px;"></div>
+      </div>
+    </div>
+
+    <!-- Proposals & Audit Log -->
+    <div class="grid">
+      <div class="card">
+        <h2>Transit Change Proposals Review</h2>
+        <div id="proposalsBox">Loading proposals...</div>
+      </div>
+
+      <div class="card">
+        <h2>System Security & Audit Log</h2>
+        <div style="max-height:260px; overflow-y:auto;">
+          <table id="auditTable">
+            <thead><tr><th>Timestamp</th><th>User ID</th><th>Action</th></tr></thead>
+            <tbody id="auditBody"><tr><td colspan="3">Loading audit log...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const T = sessionStorage.getItem("t") || "";
+    const role = sessionStorage.getItem("role") || "";
+    const name = sessionStorage.getItem("name") || "";
+
+    if (T && name) {
+      document.getElementById("authStatus").innerHTML = `<b>${name}</b> (${role}) | <a href="#" onclick="sessionStorage.clear();location='/login';" style="color:var(--err);">Sign out</a>`;
+    }
+
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+    async function loadAdminData() {
+      if (!T) { alert("Admin login required."); location = "/login"; return; }
+      try {
+        const [reqs, users, props, audits] = await Promise.all([
+          fetch("/api/admin/requests", { headers: { "x-token": T } }).then(r => r.json()),
+          fetch("/api/admin/users", { headers: { "x-token": T } }).then(r => r.json()),
+          fetch("/api/bus/proposals", { headers: { "x-token": T } }).then(r => r.json()),
+          fetch("/api/admin/audit", { headers: { "x-token": T } }).then(r => r.json())
+        ]);
+
+        // 1. Role requests
+        if (!reqs.length) {
+          document.getElementById("requestsBox").innerHTML = "<p style='color:var(--mut); margin:0;'>No pending access requests.</p>";
+        } else {
+          document.getElementById("requestsBox").innerHTML = `
+            <table>
+              <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Requested Role</th><th>Note</th><th>Actions</th></tr></thead>
+              <tbody>
+                ${reqs.map(r => `
+                  <tr>
+                    <td>#${r.id}</td>
+                    <td><b>${esc(r.name)}</b></td>
+                    <td>${esc(r.email)}</td>
+                    <td>${esc(r.requested_role)}</td>
+                    <td>${esc(r.request_note || "-")}</td>
+                    <td>
+                      <button onclick="decideRequest(${r.id}, 'approve', '${r.requested_role}')" style="padding:2px 8px; font-size:11px;">Approve</button>
+                      <button class="danger" onclick="decideRequest(${r.id}, 'reject', '${r.requested_role}')" style="padding:2px 8px; font-size:11px;">Reject</button>
+                    </td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          `;
+        }
+
+        // 2. Users
+        document.getElementById("userBody").innerHTML = users.map(u => `
+          <tr>
+            <td>#${u.id}</td>
+            <td><b>${esc(u.name)}</b></td>
+            <td>${esc(u.email)}</td>
+            <td>${esc(u.role)}${u.amb_code ? ` [${u.amb_code}]` : ""}</td>
+            <td><span class="badge badge-${u.status}">${u.status.toUpperCase()}</span></td>
+            <td>
+              ${u.role !== 'admin' ? `
+                <button class="${u.status === 'active' ? 'danger' : 'sec'}" onclick="toggleUserStatus(${u.id}, '${u.status === 'active' ? 'suspended' : 'active'}')" style="padding:2px 6px; font-size:11px;">
+                  ${u.status === 'active' ? 'Suspend' : 'Activate'}
+                </button>
+              ` : '-'}
+            </td>
+          </tr>
+        `).join("");
+
+        // 3. Proposals
+        if (!props.length) {
+          document.getElementById("proposalsBox").innerHTML = "<p style='color:var(--mut); margin:0;'>No transit proposals submitted.</p>";
+        } else {
+          document.getElementById("proposalsBox").innerHTML = `
+            <table>
+              <thead><tr><th>#</th><th>Route</th><th>Kind</th><th>Summary</th><th>Status</th><th>Review</th></tr></thead>
+              <tbody>
+                ${props.map(p => `
+                  <tr>
+                    <td>#${p.id}</td>
+                    <td>Route #${p.route_id || p.route}</td>
+                    <td>${esc(p.kind)}</td>
+                    <td>${esc(p.summary || p.change)}</td>
+                    <td><b>${p.status.toUpperCase()}</b></td>
+                    <td>
+                      ${p.status === 'pending' ? `
+                        <button onclick="decideProposal(${p.id}, 'approved')" style="padding:2px 6px; font-size:11px;">Approve</button>
+                        <button class="danger" onclick="decideProposal(${p.id}, 'rejected')" style="padding:2px 6px; font-size:11px;">Reject</button>
+                      ` : '-'}
+                    </td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          `;
+        }
+
+        // 4. Audit
+        document.getElementById("auditBody").innerHTML = audits.map(a => `
+          <tr>
+            <td>${(a.at || "").slice(0, 19).replace("T", " ")}</td>
+            <td>${a.user_id ? `#${a.user_id}` : "System"}</td>
+            <td>${esc(a.action)}</td>
+          </tr>
+        `).join("");
+
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function decideRequest(uid, decision, role) {
+      const body = { decision };
+      if (decision === "approve" && role === "ambulance") {
+        const code = prompt("Assign Ambulance Identification Code (e.g. AMB-005):", "AMB-005");
+        if (!code) return;
+        body.amb_code = code;
+      }
+      try {
+        const r = await fetch(`/api/admin/requests/${uid}/decision`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-token": T },
+          body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Decision failed");
+        loadAdminData();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function toggleUserStatus(uid, status) {
+      try {
+        const r = await fetch(`/api/admin/users/${uid}/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-token": T },
+          body: JSON.stringify({ status })
+        });
+        if (!r.ok) throw new Error("Failed to update status");
+        loadAdminData();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function assignRoute() {
+      const rid = Number(document.getElementById("assignRid").value);
+      const uid = Number(document.getElementById("assignUid").value);
+      const msg = document.getElementById("assignMsg");
+      msg.textContent = "";
+
+      try {
+        const r = await fetch(`/api/admin/bus-routes/${rid}/assign`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-token": T },
+          body: JSON.stringify({ operator_id: uid })
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Assignment failed");
+        msg.innerHTML = `<span style="color:#15803d; font-weight:600;">Route #${rid} assigned to User #${uid}.</span>`;
+      } catch (e) {
+        msg.innerHTML = `<span style="color:var(--err);">${e.message}</span>`;
+      }
+    }
+
+    async function decideProposal(pid, decision) {
+      try {
+        const r = await fetch(`/api/admin/proposals/${pid}/decision`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-token": T },
+          body: JSON.stringify({ decision })
+        });
+        if (!r.ok) throw new Error("Proposal decision failed");
+        loadAdminData();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    loadAdminData();
+  </script>
+</body>
+</html>

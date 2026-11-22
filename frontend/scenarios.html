@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Scenario Simulation & Incident Injection</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root { --bg:#f4f6f5; --ink:#16211d; --mut:#51605a; --acc:#0b6e4f; --line:#cfd8d3; --panel:#fff; --err:#c1121f; }
+    @media(prefers-color-scheme:dark){ :root { --bg:#121816; --ink:#e6efeb; --mut:#9db0a8; --acc:#4fc79c; --line:#33403a; --panel:#1b2420; } }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.45 system-ui,sans-serif; background:var(--bg); color:var(--ink); display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+    header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+    .brand { font-weight:700; font-size:16px; color:var(--acc); text-decoration:none; display:flex; align-items:center; gap:6px; }
+    nav { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    nav a { color:var(--ink); text-decoration:none; padding:5px 9px; border-radius:5px; font-weight:500; font-size:13px; }
+    nav a:hover, nav a.active { background:var(--line); color:var(--acc); }
+    
+    .main-layout { display:grid; grid-template-columns:380px 1fr; flex:1; height:calc(100vh - 54px); }
+    aside { background:var(--panel); border-right:1px solid var(--line); padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+    #map { height:100%; width:100%; }
+    
+    .panel-box { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:12px; }
+    .panel-box h3 { margin:0 0 8px; font-size:14px; }
+    
+    input, select, button { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); }
+    button { background:var(--acc); color:#fff; border:0; font-weight:600; cursor:pointer; }
+    button:hover { opacity:0.9; }
+    
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th, td { padding:5px 6px; text-align:left; border-bottom:1px solid var(--line); }
+    th { font-weight:600; color:var(--mut); }
+    
+    @media(max-width:860px){
+      .main-layout { grid-template-columns:1fr; grid-template-rows:45vh 1fr; }
+      #map { order:-1; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="brand">🚦 Urban Traffic Platform</a>
+    <nav>
+      <a href="/map">Map</a>
+      <a href="/route-compare">Route Comparison</a>
+      <a href="/traffic-prediction">Traffic Prediction</a>
+      <a href="/transit-planning">Transit Planning</a>
+      <a href="/scenarios" class="active">Scenarios</a>
+      <a href="/reports">Reports</a>
+      <a href="/app">Legacy Console</a>
+    </nav>
+    <div style="font-size:13px;">
+      <a href="/app" style="color:var(--acc); text-decoration:none; font-weight:600;">Open Console</a>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <aside>
+      <div>
+        <h2 style="margin:0 0 4px; font-size:17px;">Incident Injection Simulation</h2>
+        <p style="margin:0; font-size:12px; color:var(--mut);">
+          Simulate a bottleneck incident on major roads and evaluate before-and-after rerouting performance.
+        </p>
+      </div>
+
+      <div class="panel-box">
+        <h3>Create Simulation Scenario</h3>
+        <form onsubmit="event.preventDefault(); runScenario();">
+          <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Scenario Name</label>
+          <input id="scenName" type="text" value="Peak Bottleneck #1" style="width:100%; margin-bottom:8px;" required>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+            <div>
+              <label style="font-size:12px; font-weight:600;">Origin Node</label>
+              <input id="scenSrc" type="number" value="0" style="width:100%;" required>
+            </div>
+            <div>
+              <label style="font-size:12px; font-weight:600;">Destination Node</label>
+              <input id="scenDst" type="number" value="35" style="width:100%;" required>
+            </div>
+          </div>
+
+          <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Road IDs to Congest (comma-separated)</label>
+          <input id="scenEdges" type="text" value="0, 1, 2" placeholder="e.g. 0, 1, 2" style="width:100%; margin-bottom:8px;" required>
+
+          <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Incident Congestion Level (0.5 to 2.0)</label>
+          <input id="scenLevel" type="number" step="0.1" min="0.5" max="2.0" value="1.9" style="width:100%; margin-bottom:12px;">
+
+          <button type="submit" style="width:100%;">Inject Incident & Recalculate</button>
+        </form>
+      </div>
+
+      <div class="panel-box" id="resultCard" style="display:none;">
+        <h3>Simulation Outcome</h3>
+        <table id="resultTable"></table>
+        <div id="statSummary" style="margin-top:10px; font-size:12px; line-height:1.5;"></div>
+      </div>
+
+      <div class="panel-box">
+        <h3>Saved Scenario Runs</h3>
+        <div id="historyList" style="max-height:160px; overflow-y:auto; font-size:12px;">Loading past runs...</div>
+      </div>
+    </aside>
+
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const T = sessionStorage.getItem("t") || "";
+    let map = L.map("map").setView([13.088, 80.207], 14);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap", opacity: 0.65 }).addTo(map);
+
+    let net = null;
+    let baseLayer = L.layerGroup().addTo(map);
+    let routeLayers = L.layerGroup().addTo(map);
+
+    async function init() {
+      const headers = T ? { "x-token": T } : {};
+      const r = await fetch("/api/network", { headers });
+      if (!r.ok) return;
+      net = await r.json();
+      if (!net || !net.nodes) return;
+      if (net.bounds) map.fitBounds(net.bounds);
+
+      net.edges.forEach(e => {
+        const p1 = net.nodes[e.a], p2 = net.nodes[e.b];
+        if (p1 && p2) {
+          const line = L.polyline([p1, p2], { color: "#d5dcd8", weight: 3 }).addTo(baseLayer);
+          line.bindTooltip(`Edge #${e.id}`);
+        }
+      });
+      loadHistory();
+    }
+
+    async function runScenario() {
+      const name = document.getElementById("scenName").value.trim();
+      const src = Number(document.getElementById("scenSrc").value);
+      const dst = Number(document.getElementById("scenDst").value);
+      const edges = document.getElementById("scenEdges").value.split(",").map(x => Number(x.trim()));
+      const level = Number(document.getElementById("scenLevel").value);
+
+      try {
+        const headers = { "Content-Type": "application/json" };
+        if (T) headers["x-token"] = T;
+
+        const r = await fetch("/api/scenario", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ name, src, dst, edge_ids: edges, level })
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Scenario execution failed");
+
+        routeLayers.clearLayers();
+        // Baseline: blue dashed
+        L.polyline(d.baseline.coords, { color: "#1d4ed8", weight: 4, dashArray: "8 6" }).addTo(routeLayers);
+        // Rerouted: purple solid
+        L.polyline(d.rerouted.coords, { color: "#7c3aed", weight: 5 }).addTo(routeLayers);
+
+        map.fitBounds(L.latLngBounds(d.baseline.coords), { padding: [40, 40] });
+
+        document.getElementById("resultCard").style.display = "block";
+        document.getElementById("resultTable").innerHTML = `
+          <tr><th>State</th><th>Minutes</th><th>km</th></tr>
+          <tr><td>Baseline (Pre-incident)</td><td>${d.baseline.minutes} min</td><td>${d.baseline.km} km</td></tr>
+          <tr><td><span style="color:var(--err); font-weight:600;">Congested (No reroute)</span></td><td><b>${d.same_route_after_change.minutes} min</b></td><td>${d.same_route_after_change.km} km</td></tr>
+          <tr><td><span style="color:#7c3aed; font-weight:600;">Rerouted (Traffic-aware)</span></td><td><b>${d.rerouted.minutes} min</b></td><td>${d.rerouted.km} km</td></tr>
+        `;
+
+        document.getElementById("statSummary").innerHTML = `
+          <b>Delay without rerouting:</b> +${d.delay_if_no_reroute} min<br>
+          <b>Recovered by rerouting:</b> <b>${d.recovered_by_rerouting} min saved</b><br>
+          <span style="color:var(--mut);">Data source: ${d.data_source}</span>
+        `;
+        loadHistory();
+      } catch (err) {
+        alert("Scenario failed: " + err.message);
+      }
+    }
+
+    async function loadHistory() {
+      try {
+        const headers = T ? { "x-token": T } : {};
+        const r = await fetch("/api/scenarios", { headers });
+        if (!r.ok) return;
+        const list = await r.json();
+        if (!list.length) {
+          document.getElementById("historyList").innerHTML = "No scenarios recorded yet.";
+          return;
+        }
+        document.getElementById("historyList").innerHTML = list.slice(0, 5).map(s => `
+          <div style="padding:4px 0; border-bottom:1px solid var(--line);">
+            <b>${s.name || "Incident"}</b>: Delay +${s.result.delay_if_no_reroute}m, Recovered ${s.result.recovered_by_rerouting}m
+          </div>
+        `).join("");
+      } catch (e) {}
+    }
+
+    init();
+  </script>
+</body>
+</html>

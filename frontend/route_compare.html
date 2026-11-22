@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Route Optimization Comparison - Urban Traffic Platform</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root { --bg:#f4f6f5; --ink:#16211d; --mut:#51605a; --acc:#0b6e4f; --line:#cfd8d3; --panel:#fff; --err:#c1121f; }
+    @media(prefers-color-scheme:dark){ :root { --bg:#121816; --ink:#e6efeb; --mut:#9db0a8; --acc:#4fc79c; --line:#33403a; --panel:#1b2420; } }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.45 system-ui,sans-serif; background:var(--bg); color:var(--ink); display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+    header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+    .brand { font-weight:700; font-size:16px; color:var(--acc); text-decoration:none; display:flex; align-items:center; gap:6px; }
+    nav { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    nav a { color:var(--ink); text-decoration:none; padding:5px 9px; border-radius:5px; font-weight:500; font-size:13px; }
+    nav a:hover, nav a.active { background:var(--line); color:var(--acc); }
+    
+    .main-layout { display:grid; grid-template-columns:420px 1fr; flex:1; height:calc(100vh - 54px); }
+    aside { background:var(--panel); border-right:1px solid var(--line); padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+    #map { height:100%; width:100%; }
+    
+    .panel-box { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:12px; }
+    .panel-box h3 { margin:0 0 8px; font-size:14px; }
+    
+    input, select, button { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); }
+    button { background:var(--acc); color:#fff; border:0; font-weight:600; cursor:pointer; }
+    button.sec { background:transparent; color:var(--acc); border:1px solid var(--acc); }
+    button:hover { opacity:0.9; }
+    
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th, td { padding:6px 8px; text-align:left; border-bottom:1px solid var(--line); }
+    th { font-weight:600; color:var(--mut); }
+    .metric-badge { display:inline-block; padding:2px 6px; border-radius:4px; font-weight:700; font-size:11px; }
+    
+    @media(max-width:860px){
+      .main-layout { grid-template-columns:1fr; grid-template-rows:45vh 1fr; }
+      #map { order:-1; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="brand">🚦 Urban Traffic Platform</a>
+    <nav>
+      <a href="/map">Map</a>
+      <a href="/route-compare" class="active">Route Comparison</a>
+      <a href="/traffic-prediction">Traffic Prediction</a>
+      <a href="/transit-planning">Transit Planning</a>
+      <a href="/scenarios">Scenarios</a>
+      <a href="/reports">Reports</a>
+      <a href="/app">Legacy Console</a>
+    </nav>
+    <div style="font-size:13px;">
+      <a href="/app" style="color:var(--acc); text-decoration:none; font-weight:600;">Open Console</a>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <aside>
+      <div>
+        <h2 style="margin:0 0 4px; font-size:17px;">Route Optimization Engine</h2>
+        <p style="margin:0; font-size:12px; color:var(--mut);">
+          Compare Distance-Only vs Traffic-Aware vs AI-Predicted routes under identical conditions.
+        </p>
+      </div>
+
+      <div class="panel-box">
+        <h3>Trip Parameters</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+          <div>
+            <label style="font-size:12px; font-weight:600;">Origin Junction</label>
+            <input id="src" type="number" min="0" placeholder="e.g. 0">
+          </div>
+          <div>
+            <label style="font-size:12px; font-weight:600;">Destination Junction</label>
+            <input id="dst" type="number" min="0" placeholder="e.g. 35">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+          <div>
+            <label style="font-size:12px; font-weight:600;">Departure Hour (0-23)</label>
+            <input id="hour" type="number" min="0" max="23" value="9">
+          </div>
+          <div>
+            <label style="font-size:12px; font-weight:600;">Day of Week (0-6)</label>
+            <select id="dow">
+              <option value="0">Monday</option>
+              <option value="1" selected>Tuesday</option>
+              <option value="2">Wednesday</option>
+              <option value="3">Thursday</option>
+              <option value="4">Friday</option>
+              <option value="5">Saturday</option>
+              <option value="6">Sunday</option>
+            </select>
+          </div>
+        </div>
+        <button style="width:100%;" onclick="runComparison()">Run Comparative Optimization</button>
+      </div>
+
+      <div class="panel-box" id="resultsBox" style="display:none;">
+        <h3>Comparative Performance</h3>
+        <table id="perfTable"></table>
+
+        <h4 style="margin:14px 0 6px; font-size:13px;">A* vs Dijkstra Proof of Equivalence</h4>
+        <div id="algoProof" style="font-size:12px; color:var(--mut);"></div>
+      </div>
+
+      <div class="panel-box">
+        <h3>Routing Regimes</h3>
+        <div style="font-size:12px; display:flex; flex-direction:column; gap:6px;">
+          <div><b style="color:#1d4ed8;">--- Distance-Only (Dijkstra/A* Static):</b> Ignores traffic, minimizing free-flow travel distance.</div>
+          <div><b style="color:#7c3aed;">— Traffic-Aware (A* Aware):</b> Evaluates real-time live/simulated congestion using BPR edge loads.</div>
+          <div><b style="color:#059669;">··· AI-Predicted Traffic:</b> Evaluates time-dependent traffic at the predicted vehicle arrival time on each edge.</div>
+        </div>
+      </div>
+    </aside>
+
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const T = sessionStorage.getItem("t") || "";
+    let map = L.map("map").setView([13.088, 80.207], 14);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap", opacity: 0.65 }).addTo(map);
+
+    let net = null;
+    let baseLayer = L.layerGroup().addTo(map);
+    let routeLayers = L.layerGroup().addTo(map);
+
+    async function init() {
+      const headers = T ? { "x-token": T } : {};
+      const r = await fetch("/api/network", { headers });
+      if (!r.ok) return;
+      net = await r.json();
+      if (!net || !net.nodes) return;
+      if (net.bounds) map.fitBounds(net.bounds);
+
+      // Draw faint network lines
+      net.edges.forEach(e => {
+        const p1 = net.nodes[e.a], p2 = net.nodes[e.b];
+        if (p1 && p2) L.polyline([p1, p2], { color: "#cfd8d3", weight: 2 }).addTo(baseLayer);
+      });
+
+      // Populate default junctions
+      const nodeKeys = Object.keys(net.nodes).map(Number);
+      document.getElementById("src").value = nodeKeys[0];
+      document.getElementById("dst").value = nodeKeys[nodeKeys.length - 1];
+    }
+
+    async function runComparison() {
+      const src = document.getElementById("src").value;
+      const dst = document.getElementById("dst").value;
+      const hour = document.getElementById("hour").value;
+      const dow = document.getElementById("dow").value;
+      if (src === "" || dst === "") { alert("Please specify both origin and destination junctions."); return; }
+
+      const headers = T ? { "x-token": T } : {};
+      try {
+        // Fetch comparative endpoint
+        const [cmpRes, astarRes, dijkRes, predRes] = await Promise.all([
+          fetch(`/api/compare?src=${src}&dst=${dst}`, { headers }).then(r => r.json()),
+          fetch(`/api/route?src=${src}&dst=${dst}&algo=astar&mode=aware`, { headers }).then(r => r.json()),
+          fetch(`/api/route?src=${src}&dst=${dst}&algo=dijkstra&mode=aware`, { headers }).then(r => r.json()),
+          fetch(`/api/route?src=${src}&dst=${dst}&algo=astar&mode=aware&hour=${hour}&dow=${dow}`, { headers }).then(r => r.json())
+        ]);
+
+        routeLayers.clearLayers();
+
+        // 1. Static (Distance-Only)
+        L.polyline(cmpRes.static_shortest.coords, { color: "#1d4ed8", weight: 4, dashArray: "8 6" }).addTo(routeLayers);
+        // 2. Traffic-Aware
+        L.polyline(astarRes.coords, { color: "#7c3aed", weight: 5 }).addTo(routeLayers);
+        // 3. Predicted
+        L.polyline(predRes.coords, { color: "#059669", weight: 3, dashArray: "3 5" }).addTo(routeLayers);
+
+        map.fitBounds(L.latLngBounds(astarRes.coords), { padding: [40, 40] });
+
+        // Update tables
+        document.getElementById("resultsBox").style.display = "block";
+        const tbl = document.getElementById("perfTable");
+        tbl.innerHTML = `
+          <tr><th>Strategy</th><th>Travel Time</th><th>Distance</th><th>Expanded</th></tr>
+          <tr>
+            <td><b style="color:#1d4ed8;">Distance-Only</b></td>
+            <td>${cmpRes.static_shortest.minutes} min</td>
+            <td>${cmpRes.static_shortest.km} km</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td><b style="color:#7c3aed;">Traffic-Aware</b></td>
+            <td><b>${astarRes.minutes} min</b></td>
+            <td>${astarRes.km} km</td>
+            <td>${astarRes.expanded} nodes</td>
+          </tr>
+          <tr>
+            <td><b style="color:#059669;">AI-Predicted</b></td>
+            <td><b>${predRes.minutes} min</b></td>
+            <td>${predRes.km} km</td>
+            <td>${predRes.expanded} nodes</td>
+          </tr>
+          <tr style="background:rgba(11,110,79,0.08);">
+            <td colspan="4" style="font-weight:600; color:var(--acc);">
+              Savings: ${cmpRes.saved_minutes} min (${cmpRes.saved_pct}% reduction vs distance-only)
+            </td>
+          </tr>
+        `;
+
+        // Algo proof
+        const costDiff = Math.abs(astarRes.minutes - dijkRes.minutes);
+        const proofDiv = document.getElementById("algoProof");
+        proofDiv.innerHTML = `
+          <b>Mathematical Cost Equivalence:</b><br>
+          A* Travel Time: <b>${astarRes.minutes} min</b> | Dijkstra Travel Time: <b>${dijkRes.minutes} min</b><br>
+          Cost Difference: <code>${costDiff.toFixed(6)} min</code> (${costDiff < 1e-4 ? "Identical Cost Confirmed" : "Discrepancy"})<br>
+          Search Efficiency: A* expanded <b>${astarRes.expanded}</b> nodes vs Dijkstra <b>${dijkRes.expanded}</b> nodes 
+          (<b>${Math.round((1 - astarRes.expanded / dijkRes.expanded) * 100)}%</b> fewer expansions).
+        `;
+      } catch (err) {
+        alert("Comparison failed: " + err.message);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

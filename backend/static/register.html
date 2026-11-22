@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Register - Urban Traffic Platform</title>
+  <style>
+    :root { --bg:#f4f6f5; --ink:#16211d; --mut:#51605a; --acc:#0b6e4f; --line:#cfd8d3; --panel:#fff; --err:#c1121f; --suc:#15803d; }
+    @media(prefers-color-scheme:dark){ :root { --bg:#121816; --ink:#e6efeb; --mut:#9db0a8; --acc:#4fc79c; --line:#33403a; --panel:#1b2420; } }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--ink); display:grid; place-items:center; min-height:100vh; padding:16px; }
+    .card { width:100%; max-width:440px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:28px; box-shadow:0 4px 12px rgba(0,0,0,0.05); }
+    h1 { font-size:22px; margin:0 0 8px; color:var(--acc); }
+    p.sub { margin:0 0 20px; color:var(--mut); font-size:14px; }
+    label { display:block; font-weight:600; margin-bottom:4px; font-size:13px; }
+    input, select, textarea { width:100%; padding:9px 12px; margin-bottom:14px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); font-size:14px; font-family:inherit; }
+    button { width:100%; padding:10px; border-radius:6px; background:var(--acc); color:#fff; border:0; font-size:15px; font-weight:600; cursor:pointer; }
+    button:hover { opacity:0.92; }
+    .msg { padding:10px; border-radius:6px; margin-bottom:16px; font-size:13px; display:none; }
+    .msg.err { background:#fee2e2; color:var(--err); border:1px solid #f87171; display:block; }
+    .msg.suc { background:#dcfce7; color:var(--suc); border:1px solid #86efac; display:block; }
+    .foot { margin-top:20px; text-align:center; font-size:13px; color:var(--mut); }
+    .foot a { color:var(--acc); font-weight:600; text-decoration:none; }
+    .foot a:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Create Account</h1>
+    <p class="sub">Register for urban traffic, public transport & emergency routing</p>
+    <div id="msg" class="msg"></div>
+    <form id="f" onsubmit="event.preventDefault(); doRegister();">
+      <label for="nm">Full Name</label>
+      <input id="nm" type="text" required placeholder="John Doe">
+      
+      <label for="em">Email Address</label>
+      <input id="em" type="email" required autocomplete="email" placeholder="name@domain.com">
+      
+      <label for="pw">Password (min 8 characters)</label>
+      <input id="pw" type="password" required minlength="8" autocomplete="new-password" placeholder="••••••••">
+      
+      <label for="rr">Account Role / Access Request</label>
+      <select id="rr" onchange="toggleNote(this.value)">
+        <option value="">General User (Standard Routing)</option>
+        <option value="bus_operator">Bus Operator (Route & Schedule Management)</option>
+        <option value="ambulance">Ambulance Operator (Emergency Priority Routing)</option>
+      </select>
+      
+      <div id="noteBox" style="display:none;">
+        <label for="note">Justification / Request Note</label>
+        <input id="note" type="text" maxlength="200" placeholder="e.g. Apollo Ambulance Fleet #3 or MTC Depot #4">
+      </div>
+      
+      <button type="submit" id="btn">Create Account</button>
+    </form>
+    <div class="foot">
+      Already have an account? <a href="/login">Sign in</a><br><br>
+      <a href="/">← Back to Landing Page</a>
+    </div>
+  </div>
+  <script>
+    const msg = document.getElementById("msg");
+    function toggleNote(val) {
+      document.getElementById("noteBox").style.display = val ? "block" : "none";
+    }
+    async function doRegister() {
+      msg.className = "msg"; msg.textContent = "";
+      const nm = document.getElementById("nm").value.trim();
+      const em = document.getElementById("em").value.trim();
+      const pw = document.getElementById("pw").value;
+      const rr = document.getElementById("rr").value || null;
+      const note = document.getElementById("note").value.trim();
+      const btn = document.getElementById("btn");
+      btn.disabled = true; btn.textContent = "Creating account...";
+      try {
+        const r = await fetch("/api/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: nm, email: em, password: pw, request_role: rr, request_note: note })
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Registration failed");
+        msg.className = "msg suc";
+        msg.textContent = rr ? "Account created! Your role request is pending administrator review. Redirecting to login..." : "Account created successfully! Redirecting to login...";
+        setTimeout(() => location = "/login", 1500);
+      } catch (e) {
+        msg.className = "msg err"; msg.textContent = e.message;
+        btn.disabled = false; btn.textContent = "Create Account";
+      }
+    }
+  </script>
+</body>
+</html>

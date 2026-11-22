@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Analysis and charts</title>
+<style>:root{--bg:#f3f5f4;--ink:#16211d;--mut:#51605a;--acc:#0b6e4f;--line:#cfd8d3;--panel:#fff}@media(prefers-color-scheme:dark){:root{--bg:#121816;--ink:#e6efeb;--mut:#9db0a8;--acc:#4fc79c;--line:#33403a;--panel:#1b2420}}
+body{margin:0;font:15px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--ink)}a{color:var(--acc)}main{max-width:1000px;margin:0 auto;padding:20px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;margin:16px 0}h1{font-size:22px}h2{font-size:17px;margin:0 0 6px}.n{color:var(--mut);font-size:13px}
+input,select,button{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}table{border-collapse:collapse}td,th{border-bottom:1px solid var(--line);padding:3px 10px;text-align:left}
+.cw{position:relative;height:280px}</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script></head>
+<body><main><p><a href="/app">Back to dashboard</a></p><h1>Analysis and charts</h1>
+<section><h2>Traffic prediction</h2><div>Day <select id="dow"><option value="0">Mon</option><option value="1" selected>Tue</option><option value="2">Wed</option><option value="3">Thu</option><option value="4">Fri</option><option value="5">Sat</option><option value="6">Sun</option></select>
+ Hour <input id="hr" type="number" min="0" max="23" value="9" style="width:60px"> <button onclick="pred()">Update</button></div>
+<div class="cw"><canvas id="c1"></canvas></div><div id="hot" class="n"></div><p class="n" id="src1"></p></section>
+<section><h2>Model evaluation</h2><div class="cw"><canvas id="c2"></canvas></div><p class="n" id="note"></p></section>
+<div id="adminbox"><section><h2>Scenario comparison (admin)</h2><div class="cw"><canvas id="c3"></canvas></div><p class="n" id="m3">Simulated data. Each group is one saved scenario.</p></section>
+<section><h2>Emergency trips (admin)</h2><div class="cw"><canvas id="c4"></canvas></div><p class="n" id="m4"></p></section></div></main>
+<script>const T=sessionStorage.getItem("t");if(!T)location="/app";const days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];let ME,ch={};
+const api=async p=>{const r=await fetch("/api"+p,{headers:{"x-token":T}});if(r.status==401){sessionStorage.removeItem("t");location="/app"}const j=await r.json();if(!r.ok)throw new Error(j.detail);return j};
+const mk=(id,cfg)=>{if(ch[id]&&ch[id].destroy)ch[id].destroy();ch[id]=new Chart(document.getElementById(id),{...cfg,options:{maintainAspectRatio:false,...(cfg.options||{})}})};
+const ttl=t=>({plugins:{title:{display:true,text:t}}});
+async function pred(){const d=+dow.value,r=await api("/predict/curve?dow="+d);
+ mk("c1",{type:"line",data:{labels:r.hours,datasets:[{label:"Random Forest",data:r.random_forest},{label:"Hourly-mean baseline",data:r.baseline_hourly_mean}]},options:{plugins:{title:{display:true,text:"Average road load by hour, "+days[d]}},scales:{y:{title:{display:true,text:"load (volume / capacity)"}},x:{title:{display:true,text:"hour of day"}}}}});
+ src1.textContent=r.data_source+".";const p=await api(`/predict?hour=${hr.value}&dow=${d}`);hot.innerHTML=`Hotspots at ${hr.value}:00: `+p.hotspots.map(x=>`road ${x.edge} (${x.load})`).join(", ")}
+async function met(){const m=await api("/metrics"),a=m.random_forest,b=m.baseline_hourly_mean;
+ mk("c2",{type:"bar",data:{labels:["MAE","RMSE"],datasets:[{label:"Random Forest",data:[a.MAE,a.RMSE]},{label:"Hourly-mean baseline",data:[b.MAE,b.RMSE]}]},options:ttl("Error on a held-out simulated week (lower is better)")});
+ note.textContent=m.note+(m.live_retrained?` Live retrain: RF MAE ${m.live_retrained.random_forest.MAE} vs baseline ${m.live_retrained.baseline_road_mean.MAE}.`:" No live-data retraining has been run yet.")}
+async function scen(){const s=(await api("/scenarios")).slice(0,8).reverse();if(!s.length){m3.textContent="No scenarios saved yet. Run one from the dashboard.";return}
+ mk("c3",{type:"bar",data:{labels:s.map(x=>x.name.replace("Scenario ","")),datasets:[["Baseline","baseline"],["Same route after congestion","same_route_after_change"],["Rerouted","rerouted"]].map(([l,k])=>({label:l,data:s.map(x=>x.result[k].minutes)}))},options:{plugins:{title:{display:true,text:"Travel time by scenario (minutes, simulated)"}},scales:{y:{title:{display:true,text:"minutes"}}}}})}
+async function ops(){const r=await api("/reports"),g=[...new Set(r.trips.map(t=>t.severity))];if(!g.length){m4.textContent="No emergency trips recorded yet.";return}
+ mk("c4",{type:"bar",data:{labels:g,datasets:["Completed","Cancelled","Active"].map(st=>({label:st,data:g.map(x=>(r.trips.find(t=>t.severity==x&&t.status==st)||{n:0}).n)}))},options:{plugins:{title:{display:true,text:"Emergency trips by severity and status"}},scales:{y:{title:{display:true,text:"trips"},ticks:{precision:0}}}}});
+ m4.textContent=r.traffic.label+". Proposals: "+JSON.stringify(r.proposals)}
+(async()=>{try{ME=await api("/me");pred();met();if(ME.role=="admin"){scen();ops()}else adminbox.hidden=true}catch(e){document.querySelector("main").insertAdjacentHTML("beforeend","<p>"+e.message+"</p>")}})()</script></body></html>

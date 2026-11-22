@@ -1,0 +1,20 @@
+<nodes version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <node id="node_0" x="1916.00" y="-193.14" type="priority"/>
+    <node id="node_1" x="1966.49" y="1366.41" type="priority"/>
+    <node id="node_2" x="1092.45" y="284.49" type="priority"/>
+    <node id="node_3" x="1130.83" y="1392.38" type="priority"/>
+    <node id="node_4" x="-160.77" y="1448.44" type="priority"/>
+    <node id="node_5" x="1936.65" y="533.24" type="priority"/>
+    <node id="node_6" x="1950.59" y="532.47" type="priority"/>
+    <node id="node_7" x="1926.92" y="524.70" type="priority"/>
+    <node id="node_8" x="1434.43" y="1380.51" type="priority"/>
+    <node id="node_10" x="710.67" y="1627.48" type="priority"/>
+    <node id="node_11" x="-152.45" y="1656.67" type="priority"/>
+    <node id="node_13" x="1385.34" y="271.17" type="priority"/>
+    <node id="node_38" x="1925.40" y="241.65" type="priority"/>
+    <node id="node_42" x="1091.80" y="272.28" type="priority"/>
+    <node id="node_47" x="1956.97" y="527.25" type="priority"/>
+    <node id="node_53" x="1968.76" y="1369.19" type="priority"/>
+    <node id="node_54" x="1969.41" y="1355.86" type="priority"/>
+    <node id="node_63" x="1103.91" y="614.05" type="priority"/>
+</nodes>

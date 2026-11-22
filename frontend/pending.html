@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Access pending</title><style>:root{--bg:#f3f5f4;--ink:#16211d;--mut:#51605a;--acc:#0b6e4f;--line:#cfd8d3;--panel:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#121816;--ink:#e6efeb;--mut:#9db0a8;--acc:#4fc79c;--line:#33403a;--panel:#1b2420}}
+body{margin:0;font:16px/1.55 system-ui,sans-serif;background:var(--bg);color:var(--ink)}a{color:var(--acc)}
+.b{display:inline-block;padding:10px 18px;border-radius:6px;background:var(--acc);color:#fff;text-decoration:none;font-weight:600;margin-right:8px;border:0;font-size:15px;cursor:pointer}.b.o{background:none;color:var(--acc);border:1px solid var(--acc)}
+table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid var(--line);padding:6px;text-align:left}</style></head>
+<body style="display:grid;place-items:center;min-height:100vh"><div style="max-width:440px;padding:24px;background:var(--panel);border:1px solid var(--line);border-radius:8px">
+<h2 id="h">Checking your request…</h2><p id="m"></p><button class="b o" onclick="sessionStorage.removeItem('t');location='/'">Sign out</button>
+<script>const T=sessionStorage.getItem("t");if(!T)location="/app";
+async function chk(){const r=await fetch("/api/me",{headers:{"x-token":T}});if(!r.ok){sessionStorage.removeItem("t");return location="/app"}const u=await r.json();
+ if(u.role!="user"||!u.request_status)return location="/app";const p=u.request_status=="pending";
+ h.textContent=p?"Waiting for admin approval":"Request not approved";m.textContent=p?`Your request for ${u.requested_role.replace("_"," ")} access is with an administrator. This page updates by itself.`:"An administrator did not approve this request. You can still use the app as a general user.";
+ if(!p)m.innerHTML+=' <a href="/app">Continue as general user</a>'}
+chk();setInterval(chk,10000)</script></div></body></html>

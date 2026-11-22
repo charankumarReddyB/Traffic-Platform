@@ -39,6 +39,7 @@ R = [  # (requirement, tests, UI phrases, limitation)
  ("Route calculation on known networks", ["test_api::test_routing_known_network_and_bus_and_metrics", "test_live::test_real_graph_file_loads_and_routes"], ["route compare shows both routes", "10. Route Comparison Page", "9. Interactive Traffic Map"], "Anna Nagar network and 6x6 grid. Cost equivalence verified between A* and Dijkstra."),
  ("Time-dependent A* route divergence", ["test_prediction_routing::test_predicted_traffic_changes_chosen_route"], [], "[SYNTHETIC] Verifies that predicted rush-hour traffic shifts route choice from direct corridor to bypass, with peak path strictly faster than off-peak path."),
  ("A* time-dependent vs Brute-force equivalence", ["test_prediction_routing::test_astar_time_dependent_matches_brute_force"], [], "[SYNTHETIC] Exhaustive brute-force check on all simple paths on 5-node graph matches A* with time-dependent cost (< 1e-9 min diff)."),
+ ("Arrive-later-never-earlier (FIFO) property", ["test_fifo_property::test_static_routing_strictly_satisfies_fifo", "test_fifo_property::test_traffic_aware_snapshot_strictly_satisfies_fifo", "test_fifo_property::test_predicted_time_dependent_traffic_satisfies_fifo_at_operational_intervals", "test_fifo_property::test_document_theoretical_non_fifo_case_at_discrete_tree_split_boundaries", "test_fifo_property::test_monotonic_arrival_times_along_calculated_route"], [], "Verified across all 103 road segments over 24h at 1-min intervals (148,320 checks: 0 violations). Theoretical step-drops at un-interpolated tree boundaries documented in LIMITATIONS.md."),
  ("Recalculation after simulated congestion", ["test_api::test_scenario_recalculation_and_bad_input", "test_schedule::test_congestion_increases_trip_time_and_fleet_check"], ["scenario result shown", "14. Scenario Simulation Page"], "[SIMULATED] Congestion penalty injected into edge cost."),
  ("Denied or unavailable GPS", ["test_api::test_emergency_trip_lifecycle"], ["ambulance trip started"], "Covers GPS outside the simulated area and a browser with no geolocation. A real browser permission-denied prompt was not tested."),
  ("Create, complete, cancel emergency trips", ["test_api::test_emergency_trip_lifecycle", "test_pages::test_role_request_flow_and_privilege_safety", "test_bus::test_location_updates_and_reports"], ["trip completed", "history lists trip", "13. Emergency Trip History Page"], ""),
@@ -73,7 +74,7 @@ for name, tests, phrases, lim in R:
 import importlib
 os.environ.setdefault("TRAFFIC_DB", os.path.join(tempfile.mkdtemp(), "r.db"))
 os.environ.setdefault("ADMIN_PASSWORD", "report")
-sys.path.insert(0, ROOT)
+sys.path.insert(0, BACKEND_DIR)
 main = importlib.import_module("main")
 L = main.loads()
 t0 = time.perf_counter()

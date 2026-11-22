@@ -72,15 +72,30 @@ if __name__ == "__main__":
     a = p.parse_args()
     res = run_experiment(a.trials, a.seed, n_inc=a.incidents)
     rows = summarise(res, a.seed)
+    
+    os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     # Save all results to CSV
     with open(a.out, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0]))
         w.writeheader()
         w.writerows(rows)
 
+    # Also mirror to root experiments/results.csv if different
+    root_out = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "experiments", "results.csv")
+    if os.path.abspath(a.out) != os.path.abspath(root_out):
+        try:
+            os.makedirs(os.path.dirname(root_out), exist_ok=True)
+            with open(root_out, "w", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=list(rows[0]))
+                w.writeheader()
+                w.writerows(rows)
+        except Exception:
+            pass
+
     print("=" * 88)
     print("PARTIAL INFORMATION & STALE DATA STUDY (EQUAL-QUOTA COMPARISON)")
-    print("Data Source: SIMULATED (Synthetic Traffic & Incidents on Anna Nagar Road Network)")
+    print(f"Data Source: SIMULATED (Seed: {a.seed}, Trials: {a.trials}, Incidents: {a.incidents})")
+    print("Road Network: Anna Nagar, Chennai (73 junctions, 103 edges)")
     print("=" * 88)
     print("[DISCLOSURE]: 'on_route' is DROPPED from quota comparison because it requires K queries")
     print("per individual trip rather than K queries per refresh interval for the entire city.")

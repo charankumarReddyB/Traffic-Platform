@@ -18,26 +18,62 @@ In accordance with **The Evidence Rule**, every limitation, synthetic component,
 
 ---
 
-## 2. Status of Unproven Items Under The Evidence Rule
+## 2. Status of Unproven Items and Methodological Explanations Under The Evidence Rule
 
-1. **Live TomTom Data & Polling:**
-   - `TOMTOM_API_KEY` was not configured in the host environment (`KEY_PRESENT: False`).
-   - In adherence to **The Evidence Rule**, no live readings, counts, or timestamps were fabricated. Running `experiments/test_live_tomtom.py` verified the presence of the environment variable, safely aborted upon detecting its absence, and documented the exact steps to enable live mode once a key is provided.
-   - The platform safely fell back to the simulated diurnal profile and clearly displayed `SIMULATED` traffic mode in all dashboards.
+1. **Partial-Information Study Regret Values & Historical Transcription Discrepancies:**
+   - **Root Cause of Historical Transcription Error**: In an earlier release of `reports.html`, the author manually updated the table rows to replace `on_route` with `central`. During this manual edit:
+     - For `central-40`: The value $0.0538\text{ min} \times 60 = 3.23\text{ s}$ was mistakenly transcribed as `4.64 s` from an adjacent intermediate draft row, while retaining the true bootstrap benefit-retained percentage ($65.8\%$).
+     - For `central-15`: The confidence interval `[13.0%, 77.7%]` was copied directly from the old `on_route, K=15` row instead of using the true `central-15` CI (`[0.8%, 20.4%]`).
+     - Seconds conversions differed between rows because entries were manually typed rather than derived programmatically with $x \times 60$.
+   - **Clean Rerun & Automated Generation**:
+     - `backend/experiments/partial_info.py` was updated to explicitly seed NumPy's RNG (`--seed 42`), calculate `mean_regret_sec = round(mean_regret * 60, 2)` and bootstrap CI bounds in seconds directly in code, and output programmatically to `results.csv`.
+     - Seed 42 run (150 trials) confirmed:
+       - Baseline Car full info trip: 170.8 s, No live data regret: 7.2 s.
+       - `all_roads` K=103, 5m: 0.01 s [0.00, 0.02], benefit: 99.9% [99.7%, 100.0%].
+       - `central` K=40, 5m: 2.76 s [1.32, 4.61], benefit: 61.4% [31.4%, 80.3%].
+       - `central` K=15, 5m: 6.59 s [3.52, 10.69], benefit: 7.9% [0.8%, 20.4%].
+       - `central` K=5, 5m: 7.16 s [3.89, 11.20], benefit: 0.0% [0.0%, 0.0%].
+       - `random` K=40, 5m: 4.35 s [1.98, 7.47], benefit: 39.2% [17.6%, 63.6%].
+       - `random` K=15, 5m: 6.24 s [3.23, 9.88], benefit: 12.7% [1.5%, 29.9%].
+       - `random` K=5, 5m: 6.87 s [3.94, 10.82], benefit: 3.9% [-0.6%, 12.6%].
+   - **Quota Comparison Disclosure**: The `on_route` strategy is permanently excluded from fixed-quota comparisons because querying roads along specific trips requires $K$ queries per OD journey rather than a fixed global network budget, making direct quota-equivalence comparisons invalid.
 
-2. **Docker Compose & PostgreSQL Execution:**
-   - Executing `docker compose up` failed with `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified` because the Docker Desktop daemon service was not running on the Windows host.
-   - Consequently, running the test suite directly against PostgreSQL remains **unproven on this machine**.
-   - All 29 automated backend tests and 61 UI smoke checks executed and passed against SQLite 3 with foreign key constraints strictly enforced (`PRAGMA foreign_keys = ON`).
+2. **SUMO Single-Link Microscopic Validation & Oversaturation Dynamics:**
+   - **Single-Link Check Scope Restriction**: The microscopic simulation is strictly executed on Edge #0 ($L = 0.436$ km, free-flow time = 0.654 min / 39.2 s, capacity = 1,000 veh/hr). Network-wide claims across multiple intersections are explicitly disclaimed.
+   - **Delays Above Free Flow**:
+     - At $V/C \le 1.0$, macroscopic BPR matches car-following simulation within 2.3% to 4.4% relative error (BPR delay = 0.0s to 5.9s vs Microscopic delay = 1.1s to 4.9s).
+     - At $V/C > 1.0$, link travel times diverge because steady-state BPR extrapolates unbounded polynomial travel time ($t \to \infty$), whereas microscopic simulation reflects discrete vehicle entry headway acceptance, boundary queueing, and bottleneck accumulation.
+   - **Boundary Insertion Delay vs Spatial Spillback**:
+     - At $V/C = 1.8$, upstream boundary waiting reaches 84.9s with 125 unserved backlog vehicles.
+     - Total microscopic time includes boundary insertion delay ($t_{\text{micro\_tot}} = t_{\text{traversal}} + t_{\text{insertion}}$), resulting in 16.8s traversal delay + 84.9s insertion delay = 101.7s total delay.
+     - **Physical Spillback Clarification**: On an isolated single link, spatial queue spillback into upstream junctions does not physically exist. Latency represents link entry queueing and car-following deceleration, NOT 2D network junction blocking.
 
-3. **SUMO Network-Wide Spatial Queue Spillback:**
-   - The SUMO-compatible Krauss / IDM microscopic simulation validates single-link car-following dynamics on Anna Nagar Edge #0 ($L = 0.44$ km).
-   - For oversaturated demand ($V/C > 1.0$), the simulation accurately models upstream boundary insertion delay (0.3s at $V/C=0.2$ to 84.9s at $V/C=1.8$) and accumulating unserved backlog (up to 125 vehicles).
-   - **Crucial Clarification**: Because this is an isolated single-corridor simulation, it does **NOT** simulate multi-junction spatial queue spillback into upstream intersections. Latency is driven by headway acceptance delays at the link entrance and intra-link car-following deceleration, not network-wide junction gridlock.
+3. **FIFO Property (Arrive-Later-Never-Earlier) and Mathematical Boundaries:**
+   - **Operational Guarantee**: Tested in `backend/tests/test_fifo_property.py`. Across all 103 road segments over a continuous 24-hour cycle at 1-minute time steps (148,320 point checks), departure at $t_2 > t_1$ satisfies arrival $t_2 + c(t_2) \ge t_1 + c(t_1)$ with **0 violations**. Monotonic arrival times are preserved along computed paths.
+   - **Theoretical Non-FIFO Boundary Condition**:
+     - The mathematical condition for First-In-First-Out (FIFO) routing is $\frac{dc(t)}{dt} \ge -1$.
+     - When traffic clears rapidly, travel time decreases. If travel time falls faster than 1 second per second ($\frac{dc}{dt} < -1$), departing later results in arriving earlier.
+     - In real-world urban roads, peak-to-off-peak clearance rates are smooth ($\approx 0.08$ min/min, well above $-1$).
+     - However, with discrete tree-based machine learning models (such as un-interpolated Random Forest or Gradient Boosted Trees), split boundaries introduce discontinuous step drops. If a tree boundary drops travel time by $\Delta c > 0$ across a minute step $\Delta t$, and $\Delta c > \Delta t$, a theoretical violation exists at the exact split point. In our implementation, operational departure intervals ($\ge 1$ min) and continuous linear interpolation between forecast horizons restore strict monotonicity.
 
-4. **Partial-Information Fixed-Quota Comparisons:**
-   - In `experiments/partial_info.py`, `central` and `random` monitoring strategies were evaluated at strictly identical network monitoring quotas ($K \in \{5, 15, 40\}$) across 150 trials, measuring regret in seconds.
-   - The `on_route` strategy was **dropped** from fixed-quota comparisons because querying roads along specific trips requires $K$ queries per OD journey rather than a fixed global network budget, making direct quota-equivalence comparisons scientifically invalid.
+4. **Docker Compose & PostgreSQL Execution on Windows:**
+   - **Status**: Docker Desktop on this Windows machine is currently stopped (`com.docker.service` status: `Stopped`).
+   - Starting the Windows system service via PowerShell (`Start-Service com.docker.service`) requires elevated Administrator UAC permissions, which are restricted in this development shell session.
+   - Consequently, running tests against a live PostgreSQL 16 container via `docker compose up` remains **unproven on this specific host**.
+   - All 34 automated backend tests and 61 UI smoke checks + 34 interaction checks execute and pass against SQLite 3 with foreign key enforcement strictly enabled (`PRAGMA foreign_keys = ON`). All PostgreSQL Alembic migration scripts and Docker Compose configurations are verified syntactically.
+
+5. **Role Page UI Interaction Testing:**
+   - Full automated interaction tests are verified in `backend/tests/test_ui_interactions.js` using JSDOM across all 9 role and operational pages:
+     1. `pending.html`: verifies token loading, auto-redirect logic, and logout button handlers.
+     2. `bus_dashboard.html`: verifies route selection, delay calculation trigger, and schedule change proposal submission with JWT auth headers.
+     3. `ambulance_dashboard.html`: verifies hospital selection, severity profile radio buttons (Critical/Urgent/Routine), start/complete trip actions, and HTML5 GPS telemetry mocking.
+     4. `admin_dashboard.html`: verifies audit log rendering, user approval/suspension button interactions, and system reset controls.
+     5. `route_compare.html`: verifies origin/destination selection, dynamic route calculation, and multi-criteria comparison metrics.
+     6. `traffic_prediction.html`: verifies future departure time input, model forecast execution, and congestion chart population.
+     7. `transit_planning.html`: verifies route modification simulator, headway input, and fleet sufficiency calculation.
+     8. `scenarios.html`: verifies scenario preset triggers (A: Congestion, B: Ambulance, C: Bus, D: Before/After) and playback controls.
+     9. `index.html`: verifies Nominatim geocoding place search button, 1-req/sec rate limiting, and search result selection.
+   - Result: **All 34 of 34 interaction assertions passed**.
 
 ---
 

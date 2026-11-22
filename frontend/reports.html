@@ -56,18 +56,20 @@
     <!-- Microscopic SUMO Validation Results -->
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h2 style="margin:0;">1. SUMO / Microscopic Simulation Validation</h2>
-        <span class="badge badge-sim">SIMULATED MICRO-DYNAMICS</span>
+        <h2 style="margin:0;">1. Macroscopic BPR vs Microscopic Car-Following (Single-Link Check: Edge #0, L=0.44 km)</h2>
+        <span class="badge badge-sim">SIMULATED BENCHMARK</span>
       </div>
       <p style="margin:6px 0 10px; font-size:12px; color:var(--mut);">
-        Validates macroscopic BPR link travel times against discrete Krauss/IDM vehicle car-following simulation on real Anna Nagar road corridors.
+        Validates edge travel time model against microscopic car-following simulation on Edge #0 ($L=0.436$ km, free flow = 0.654 min / 39.2 s). Evaluates delays above free flow and upstream boundary insertion waiting time.
       </p>
       <table>
         <thead>
           <tr>
             <th>Volume/Capacity (V/C)</th>
-            <th>BPR (min)</th>
-            <th>Microscopic [95% CI]</th>
+            <th>BPR Total (min)</th>
+            <th>BPR Delay (s)</th>
+            <th>Microscopic Total [95% CI]</th>
+            <th>Micro Delay (s)</th>
             <th>Insertion Delay (s)</th>
             <th>Backlog (veh)</th>
             <th>Absolute Error</th>
@@ -75,31 +77,31 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>0.20 (Free Flow)</td><td>0.654 min</td><td>0.672 ± 0.004 min</td><td>0.3 s</td><td>3 veh</td><td>0.018 min</td><td>2.8%</td></tr>
-          <tr><td>0.40 (Light)</td><td>0.656 min</td><td>0.677 ± 0.003 min</td><td>0.3 s</td><td>12 veh</td><td>0.021 min</td><td>3.1%</td></tr>
-          <tr><td>0.60 (Moderate)</td><td>0.667 min</td><td>0.696 ± 0.004 min</td><td>0.5 s</td><td>19 veh</td><td>0.029 min</td><td>4.4%</td></tr>
-          <tr><td>0.80 (Heavy)</td><td>0.694 min</td><td>0.711 ± 0.003 min</td><td>0.5 s</td><td>15 veh</td><td>0.017 min</td><td>2.4%</td></tr>
-          <tr><td>1.00 (At Capacity)</td><td>0.752 min</td><td>0.735 ± 0.004 min</td><td>0.6 s</td><td>7 veh</td><td>0.017 min</td><td>2.3%</td></tr>
-          <tr><td>1.20 (Near Saturated)</td><td>0.857 min</td><td>0.759 ± 0.004 min</td><td>1.2 s</td><td>21 veh</td><td>0.098 min</td><td>11.5%</td></tr>
-          <tr><td>1.40 (Oversaturated)</td><td>1.031 min</td><td>0.826 ± 0.005 min</td><td>2.7 s</td><td>16 veh</td><td>0.205 min</td><td>19.9%</td></tr>
-          <tr><td>1.60 (Severe Bottleneck)</td><td>1.297 min</td><td>0.906 ± 0.004 min</td><td>14.6 s</td><td>38 veh</td><td>0.391 min</td><td>30.1%</td></tr>
-          <tr><td>1.80 (Oversaturated Backlog)</td><td>1.683 min</td><td>0.934 ± 0.002 min</td><td>84.9 s</td><td>125 veh</td><td>0.749 min</td><td>44.5%</td></tr>
+          <tr><td>0.20 (Free Flow)</td><td>0.654 min</td><td>0.0 s</td><td>0.672 ± 0.004 min</td><td>1.1 s</td><td>0.3 s</td><td>3 veh</td><td>0.018 min</td><td>2.8%</td></tr>
+          <tr><td>0.40 (Light)</td><td>0.656 min</td><td>0.1 s</td><td>0.677 ± 0.003 min</td><td>1.4 s</td><td>0.3 s</td><td>12 veh</td><td>0.021 min</td><td>3.1%</td></tr>
+          <tr><td>0.60 (Moderate)</td><td>0.667 min</td><td>0.8 s</td><td>0.696 ± 0.004 min</td><td>2.5 s</td><td>0.5 s</td><td>19 veh</td><td>0.029 min</td><td>4.4%</td></tr>
+          <tr><td>0.80 (Heavy)</td><td>0.694 min</td><td>2.4 s</td><td>0.711 ± 0.003 min</td><td>3.4 s</td><td>0.5 s</td><td>15 veh</td><td>0.017 min</td><td>2.4%</td></tr>
+          <tr><td>1.00 (At Capacity)</td><td>0.752 min</td><td>5.9 s</td><td>0.735 ± 0.004 min</td><td>4.9 s</td><td>0.6 s</td><td>7 veh</td><td>0.017 min</td><td>2.3%</td></tr>
+          <tr><td>1.20 (Near Saturated)</td><td>0.857 min</td><td>12.2 s</td><td>0.759 ± 0.004 min</td><td>6.3 s</td><td>1.2 s</td><td>21 veh</td><td>0.098 min</td><td>11.5%</td></tr>
+          <tr><td>1.40 (Oversaturated)</td><td>1.031 min</td><td>22.6 s</td><td>0.826 ± 0.005 min</td><td>10.3 s</td><td>2.7 s</td><td>16 veh</td><td>0.205 min</td><td>19.9%</td></tr>
+          <tr><td>1.60 (Severe Bottleneck)</td><td>1.297 min</td><td>38.6 s</td><td>0.906 ± 0.004 min</td><td>15.1 s</td><td>14.6 s</td><td>38 veh</td><td>0.391 min</td><td>30.1%</td></tr>
+          <tr><td>1.80 (Oversaturated Backlog)</td><td>1.683 min</td><td>61.7 s</td><td>0.934 ± 0.002 min</td><td>16.8 s</td><td>84.9 s</td><td>125 veh</td><td>0.749 min</td><td>44.5%</td></tr>
         </tbody>
       </table>
       <div style="margin-top:10px; font-size:12px; color:var(--mut); line-height:1.5;">
-        <b>Summary:</b> Overall MAE = 0.172 min | RMSE = 0.292 min | Mean Relative Error = 13.4%. For V/C &le; 1.0, BPR matches car-following simulation within 2.3% &ndash; 4.4%.<br>
-        <b>Physical Dynamics & Spillback Clarification:</b> The simulation models single-link car-following on Edge #0. For V/C &gt; 1.0, latency reflects upstream boundary insertion waiting (up to 84.9s) and accumulating unserved backlog (up to 125 vehicles), NOT multi-junction spatial queue spillback into upstream intersections.
+        <b>Scope Restriction & Validity:</b> This experiment is strictly a <i>single-link verification</i> on Edge #0. For operational demand regimes (V/C &le; 1.0), BPR closely matches car-following simulation within 2.3% &ndash; 4.4% (MAE = 0.020 min / 1.2 s).<br>
+        <b>Physical Dynamics & Delay Clarification:</b> For V/C &gt; 1.0, the steady-state BPR formula extrapolates unbounded link travel time, whereas the microscopic simulation reflects physical car-following throughput plus upstream boundary insertion waiting time (up to 84.9s) and unserved vehicle backlog (125 veh). This models entry bottlenecking on a single link, NOT multi-junction spatial gridlock spillback.
       </div>
     </div>
 
     <!-- Partial Information Study Results -->
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h2 style="margin:0;">2. Partial Information & Stale Data Study (150 Real-Network Trials)</h2>
+        <h2 style="margin:0;">2. Partial Information & Stale Data Study (150 Real-Network Trials, Seed = 42)</h2>
         <span class="badge badge-sim">SIMULATED TRAFFIC EXPERIMENT</span>
       </div>
       <p style="margin:6px 0 10px; font-size:12px; color:var(--mut);">
-        Quantifies regret in seconds comparing Central vs Random road sampling at identical quota budgets (K &in; {5, 15, 40}).
+        Quantifies routing regret in seconds comparing Betweenness Centrality vs Random road sampling at identical quota budgets (K &in; {5, 15, 40}) and 5-minute refresh intervals under synthetic congestion (trials=150, seed=42, output: results.csv).
       </p>
       <table>
         <thead>
@@ -112,19 +114,19 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>All Roads (Upper Bound)</td><td>103</td><td>1 min</td><td>0.00 s [0.00, 0.00]</td><td>100.0% [100%, 100%]</td></tr>
-          <tr><td>All Roads (Upper Bound)</td><td>103</td><td>5 min</td><td>0.18 s [0.00, 0.48]</td><td>98.2% [92.6%, 100%]</td></tr>
-          <tr><td>Betweenness Centrality</td><td>40</td><td>5 min</td><td>4.64 s [2.76, 6.52]</td><td>65.8% [35.9%, 83.2%]</td></tr>
-          <tr><td>Betweenness Centrality</td><td>15</td><td>5 min</td><td>7.55 s [5.03, 10.07]</td><td>44.3% [13.0%, 77.7%]</td></tr>
-          <tr><td>Betweenness Centrality</td><td>5</td><td>5 min</td><td>12.35 s [9.93, 14.77]</td><td>8.9% [-5.0%, 25.0%]</td></tr>
+          <tr><td>All Roads (Upper Bound)</td><td>103</td><td>1 min</td><td>0.00 s [0.00, 0.01]</td><td>100.0% [99.8%, 100.0%]</td></tr>
+          <tr><td>All Roads (Upper Bound)</td><td>103</td><td>5 min</td><td>0.01 s [0.00, 0.02]</td><td>99.9% [99.7%, 100.0%]</td></tr>
+          <tr><td>Betweenness Centrality</td><td>40</td><td>5 min</td><td>2.76 s [1.32, 4.61]</td><td>61.4% [31.4%, 80.3%]</td></tr>
+          <tr><td>Betweenness Centrality</td><td>15</td><td>5 min</td><td>6.59 s [3.52, 10.69]</td><td>7.9% [0.8%, 20.4%]</td></tr>
+          <tr><td>Betweenness Centrality</td><td>5</td><td>5 min</td><td>7.16 s [3.89, 11.20]</td><td>0.0% [0.0%, 0.0%]</td></tr>
           <tr style="border-top:1px dashed var(--line);">
-            <td>Random Sampling</td><td>40</td><td>5 min</td><td>7.51 s [4.84, 10.18]</td><td>44.6% [20.0%, 65.0%]</td></tr>
-          <tr><td>Random Sampling</td><td>15</td><td>5 min</td><td>13.43 s [10.97, 15.89]</td><td>1.0% [-6.1%, 10.6%]</td></tr>
-          <tr><td>Random Sampling</td><td>5</td><td>5 min</td><td>13.56 s [11.11, 16.01]</td><td>0.0% [-8.0%, 9.0%]</td></tr>
+            <td>Random Sampling</td><td>40</td><td>5 min</td><td>4.35 s [1.98, 7.47]</td><td>39.2% [17.6%, 63.6%]</td></tr>
+          <tr><td>Random Sampling</td><td>15</td><td>5 min</td><td>6.24 s [3.23, 9.88]</td><td>12.7% [1.5%, 29.9%]</td></tr>
+          <tr><td>Random Sampling</td><td>5</td><td>5 min</td><td>6.87 s [3.94, 10.82]</td><td>3.9% [-0.6%, 12.6%]</td></tr>
         </tbody>
       </table>
       <div style="margin-top:10px; font-size:12px; color:var(--mut); line-height:1.5;">
-        <b>Key Finding:</b> At equal quota K=40, Central arterial sampling incurs only 4.64s regret vs 13.43s for Random sampling at K=15.<br>
+        <b>Exact Programmatic Conversion:</b> In this clean rerun (seed=42), all second values are computed directly as $x \times 60$ ($2.76\text{ s} = 0.0460\text{ min} \times 60$, $6.59\text{ s} = 0.1098\text{ min} \times 60$, $7.16\text{ s} = 0.1193\text{ min} \times 60$). At K=40, Centrality monitoring achieves 61.4% benefit retention (2.76s regret) vs 39.2% (4.35s regret) for Random sampling.<br>
         <b>Quota Comparison Disclosure:</b> The on-route strategy was dropped from fixed-quota comparisons because querying roads along specific trips requires K queries per OD journey rather than a fixed global network budget, making direct quota-equivalence comparisons invalid.
       </div>
     </div>

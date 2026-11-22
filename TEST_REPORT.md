@@ -1,11 +1,11 @@
 # Test report
 
-Generated 2026-11-22 13:49 UTC on Python 3.14.7 (Windows). All numbers below come from this run.
+Generated 2026-11-22 16:28 UTC on Python 3.14.7 (Windows). All numbers below come from this run.
 
 ## Summary
-- Backend tests: **29 of 29 passed**.
+- Backend tests: **34 of 34 passed**.
 - UI smoke checks: **61 passed, 0 failed**.
-- Route calculation time (A*, traffic-aware, 0 to 35 on the 60-road simulated grid): **0.13 ms** on average over 200 runs.
+- Route calculation time (A*, traffic-aware, 0 to 35 on the 60-road simulated grid): **0.11 ms** on average over 200 runs.
 - Test Database Execution: **SQLite 3 (PRAGMA foreign_keys = ON)**. Note: PostgreSQL 16 was not executed locally because Docker Desktop daemon is not running on host.
 - Live Traffic Data Mode: **BLOCKED BY THE EVIDENCE RULE** (TOMTOM_API_KEY environment variable was not set).
 
@@ -20,6 +20,7 @@ Generated 2026-11-22 13:49 UTC on Python 3.14.7 (Windows). All numbers below com
 | Route calculation on known networks | 2 test(s), 3 UI check(s) | **PASS (with limits)** | Anna Nagar network and 6x6 grid. Cost equivalence verified between A* and Dijkstra. |
 | Time-dependent A* route divergence | 1 test(s) | **PASS (with limits)** | [SYNTHETIC] Verifies that predicted rush-hour traffic shifts route choice from direct corridor to bypass, with peak path strictly faster than off-peak path. |
 | A* time-dependent vs Brute-force equivalence | 1 test(s) | **PASS (with limits)** | [SYNTHETIC] Exhaustive brute-force check on all simple paths on 5-node graph matches A* with time-dependent cost (< 1e-9 min diff). |
+| Arrive-later-never-earlier (FIFO) property | 5 test(s) | **PASS (with limits)** | Verified across all 103 road segments over 24h at 1-min intervals (148,320 checks: 0 violations). Theoretical step-drops at un-interpolated tree boundaries documented in LIMITATIONS.md. |
 | Recalculation after simulated congestion | 2 test(s), 2 UI check(s) | **PASS (with limits)** | [SIMULATED] Congestion penalty injected into edge cost. |
 | Denied or unavailable GPS | 1 test(s), 1 UI check(s) | **PASS (with limits)** | Covers GPS outside the simulated area and a browser with no geolocation. A real browser permission-denied prompt was not tested. |
 | Create, complete, cancel emergency trips | 3 test(s), 3 UI check(s) | **PASS** |  |

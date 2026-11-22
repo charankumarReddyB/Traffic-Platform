@@ -1,0 +1,14 @@
+<edges version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <edge id="edge_0" from="node_0" to="node_38" priority="2" numLanes="2" speed="11.11"/>
+    <edge id="edge_1" from="node_1" to="node_53" priority="2" numLanes="2" speed="11.11"/>
+    <edge id="edge_2" from="node_2" to="node_42" priority="2" numLanes="2" speed="11.11"/>
+    <edge id="edge_3" from="node_2" to="node_13" priority="2" numLanes="2" speed="11.11"/>
+    <edge id="edge_4" from="node_3" to="node_63" priority="2" numLanes="2" speed="11.11"/>
+    <edge id="edge_5" from="node_3" to="node_8" priority="2" numLanes="2" speed="11.11"/>
+    <edge id="edge_6" from="node_3" to="node_10" priority="2" numLanes="2" speed="11.11"/>
+    <edge id="edge_7" from="node_4" to="node_11" priority="2" numLanes="2" speed="11.11"/>
+    <edge id="edge_8" from="node_5" to="node_54" priority="2" numLanes="2" speed="11.11"/>
+    <edge id="edge_9" from="node_5" to="node_6" priority="2" numLanes="2" speed="11.11"/>
+    <edge id="edge_10" from="node_6" to="node_47" priority="2" numLanes="2" speed="11.11"/>
+    <edge id="edge_11" from="node_7" to="node_5" priority="2" numLanes="2" speed="11.11"/>
+</edges>
